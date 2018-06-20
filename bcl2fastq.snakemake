@@ -1,0 +1,206 @@
+import itertools
+import os
+import collections
+import json
+import glob
+from snakemake.utils import R
+#from snakemake.utils import min_vession
+#min_version("3.2")
+from snakemake.exceptions import MissingInputException
+
+#Author:	Rajesh Patidar
+#Email:		patidarr
+#This is a pipeline to convert bcl files to fastq and send a report to a email list.
+# it also changes names Sample_SampleID_FCID nomenclature.
+# 
+TARGET=os.environ['TARGET']
+SOURCE=os.environ['SOURCE']
+INPUT=os.environ['INPUT']
+OUTPUT=os.environ['OUTPUT']
+MONTH=os.environ['MONTH']
+# Snakemake Base location
+shell.prefix("""
+#PBS -S /bin/bash
+source /opt/nasapps/modules/Modules/3.2.9/init/bash
+module load snakemake
+set -e -o pipefail
+sleep 10s
+""")
+path=TARGET.split("/")
+PATH=os.path.dirname(TARGET)
+FCID=path[-2]
+#onstart:
+#	shell("echo 'bcl2fastq conversion started {FCID} '| mutt -s 'bcl2fastq status ' `whoami`@mail.nih.gov ")
+#onerror:
+#	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov ")
+#onsuccess:
+#	shell("echo 'bcl2fastq pipeline finished successfully on {FCID} ' |mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov  ")
+
+f = open(PATH+"/SampleSheet.csv", 'r')
+FCName=FCID.split("_")
+FCName=FCName[-1][1:]
+TARGETS = []
+
+# Original Files names will come from the Assay_complete_master.txt
+#
+#
+OUTPUT=OUTPUT+MONTH+"/"
+for line in f:
+	line = line.rstrip()
+	if 'Sample_ID' in line: 
+		column = line.split(",")
+		sampleName  =column.index('Sample_Name')
+		project	    =column.index('Sample_Project')
+		for line in f:
+			line = line.rstrip()
+			column = line.split(",")
+			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
+			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
+			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
+#################################
+localrules: Final, Transfer
+#################################
+# Parse html pages and send report email.
+#################################
+#
+rule Final:
+	input: 
+		#INPUT+FCID+"/archive.txt",
+		TARGETS,
+		OUTPUT+FCID+"/Reports/html/tree.html"
+	params:
+		rulename = "Final",
+		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+	shell: """
+	############################
+	touch "{INPUT}{FCID}/bcl2fastq.done"
+	#chgrp -R store-mocha {OUTPUT}{FCID}/
+	cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
+	/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+	#/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" dabdccc3-6d04-11e5-ba46-22000b92c6ec: e2620047-6d04-11e5-ba46-22000b92c6ec:/data/MoCha/DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+	
+	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov
+	############################
+	"""
+#################################
+# Archive Data
+#################################
+rule Archive:
+	input:
+		OUTPUT+FCID+"/Reports/html/tree.html",
+		TARGETS
+	output:
+		INPUT+FCID+"/archive.txt"
+	params:
+		rulename = "Archive",
+		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+	shell: """
+	############################
+	mkdir -p {INPUT}{FCID}/FASTQ/
+	cp -rf {OUTPUT}{FCID}/* {INPUT}{FCID}/FASTQ/
+	
+	tar -cvf /projects/lihc_hiseq/scratch/backup/{FCID}.tar {INPUT}{FCID}
+	md5sum /projects/lihc_hiseq/scratch/backup/{FCID}.tar >/projects/lihc_hiseq/scratch/backup/{FCID}.tar.md5
+	rsync -av /projects/lihc_hiseq/scratch/backup/{FCID}.tar fr-s-bacula-1.ncifcrf.gov:/dmf/archive/projects/lihc_hiseq/archive/lihc_hiseq_static_dir_archive
+	rsync -av /projects/lihc_hiseq/scratch/backup/{FCID}.tar.md5 fr-s-bacula-1.ncifcrf.gov:/dmf/archive/projects/lihc_hiseq/archive/lihc_hiseq_static_dir_archive
+	echo "Archive Completed" >{output}
+	############################
+	"""
+#################################
+# This is to make globus input
+#
+#################################
+rule Transfer:
+	input:
+		OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R1.fastq.gz",
+		OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R2.fastq.gz"
+	output:
+		OUTPUT+FCID+"/Sample_{library}_{FCName}/Biowulf_Transfer.txt"
+	params:
+		rulename = "Transfer",
+		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+	shell: """
+	############################
+	string=`{SOURCE}mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
+
+	count=`echo ${{string}} |cut -d ' ' -f1`
+	search=`echo ${{string}} |cut -d ' ' -f2`
+	type=`echo ${{string}} |cut -d ' ' -f3`
+	project=`echo ${{string}} |cut -d ' ' -f4`
+
+	if [[ ${{project}} = 'PDX' ]]; then
+		if  [[ ${{type}} = 'RNASEQ' ]] ; then
+			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} RNA`
+			
+			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+		else
+			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} DNA`
+			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+
+		fi
+	else
+		echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+		echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+	fi
+	############################
+	"""
+#################################
+# Merge fq files if same sample is loaded on to multiple lanes.
+# Also changes names to contain FCID in it.
+#################################
+rule Merge:
+	input:
+		OUTPUT+FCID+"/Reports/html/tree.html"
+	output:
+		R1=OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R1.fastq.gz",
+		R2=OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R2.fastq.gz",
+	params:
+		rulename = "Merge",
+		batch    = "-l nodes=1:ppn=3,walltime=700:00:00,pvmem=5gb"
+	shell: """
+	############################
+	string=`{SOURCE}mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
+
+	count=`echo ${{string}} |cut -d ' ' -f1`
+	search=`echo ${{string}} |cut -d ' ' -f2`
+	type=`echo ${{string}} |cut -d ' ' -f3`
+	project=`echo ${{string}} |cut -d ' ' -f4`
+	if [ ${{count}} -gt 1 ]; then
+		echo "Working on merging"
+		R1=`find {OUTPUT}/{FCID}/ -name "${{search}}*?_R1_001.fastq.gz"|sort| tr '\\n' ' '`	
+		/bin/zcat ${{R1}} |gzip >{output.R1} & 
+		R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
+		/bin/zcat ${{R2}} |gzip >{output.R2} &
+	else
+		echo "Just Moving"
+		R1=`find {OUTPUT}/{FCID}/ -name "${{search}}*?_R1_001.fastq.gz"|sort| tr '\\n' ' '`
+		mv ${{R1}} {output.R1}
+		R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
+		mv ${{R2}} {output.R2}
+	fi
+	wait
+	############################
+	"""
+#################################
+# This is bcl2fastq conversion
+#################################
+rule BCL2FASTQ:
+	input:
+		INPUT+FCID+"/RTAComplete.txt"
+	output:
+		OUTPUT+FCID+"/Reports/html/tree.html"
+	params:
+		rulename = "bcl2fastq",
+		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=72gb,ncpus=16"
+	shell: """
+	############################
+	#module load bcl2fastq2
+	#/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ 
+	/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting
+	cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv
+	dos2unix {OUTPUT}/{FCID}/SampleSheet.csv
+	#chgrp -R store-mocha {OUTPUT}{FCID}/
+	############################
+	"""
