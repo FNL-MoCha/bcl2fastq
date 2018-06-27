@@ -31,8 +31,8 @@ PATH=os.path.dirname(TARGET)
 FCID=path[-2]
 #onstart:
 #	shell("echo 'bcl2fastq conversion started {FCID} '| mutt -s 'bcl2fastq status ' `whoami`@mail.nih.gov ")
-#onerror:
-#	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov ")
+onerror:
+	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov ")
 #onsuccess:
 #	shell("echo 'bcl2fastq pipeline finished successfully on {FCID} ' |mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov  ")
 
@@ -54,6 +54,10 @@ for line in f:
 		for line in f:
 			line = line.rstrip()
 			column = line.split(",")
+			for vals in column:
+				if ' ' in vals:
+					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov")
+					exit()
 			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
 			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
 			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
@@ -167,20 +171,10 @@ rule Merge:
 	search=`echo ${{string}} |cut -d ' ' -f2`
 	type=`echo ${{string}} |cut -d ' ' -f3`
 	project=`echo ${{string}} |cut -d ' ' -f4`
-	if [ ${{count}} -gt 1 ]; then
-		echo "Working on merging"
-		R1=`find {OUTPUT}/{FCID}/ -name "${{search}}*?_R1_001.fastq.gz"|sort| tr '\\n' ' '`	
-		/bin/zcat ${{R1}} |gzip >{output.R1} & 
-		R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
-		/bin/zcat ${{R2}} |gzip >{output.R2} &
-	else
-		echo "Just Moving"
-		R1=`find {OUTPUT}/{FCID}/ -name "${{search}}*?_R1_001.fastq.gz"|sort| tr '\\n' ' '`
-		mv ${{R1}} {output.R1}
-		R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
-		mv ${{R2}} {output.R2}
-	fi
-	wait
+	R1=`find {OUTPUT}/{FCID}/ -name "${{search}}*?_R1_001.fastq.gz"|sort| tr '\\n' ' '`
+	mv ${{R1}} {output.R1}
+	R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
+	mv ${{R2}} {output.R2}
 	############################
 	"""
 #################################
