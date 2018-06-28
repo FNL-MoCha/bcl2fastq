@@ -44,13 +44,16 @@ TARGETS = []
 # Original Files names will come from the Assay_complete_master.txt
 #
 #
+PROJECT="Other"
 OUTPUT=OUTPUT+MONTH+"/"
 for line in f:
 	line = line.rstrip()
 	if 'Sample_ID' in line: 
 		column = line.split(",")
 		sampleName  =column.index('Sample_Name')
+		sampleID  =column.index('Sample_ID')
 		project	    =column.index('Sample_Project')
+		desc     =column.index('Description')
 		for line in f:
 			line = line.rstrip()
 			column = line.split(",")
@@ -58,9 +61,14 @@ for line in f:
 				if ' ' in vals:
 					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov")
 					exit()
-			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
-			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
-			TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
+			if column[desc] == 'TST500':
+				PROJECT= 'TST500'
+				TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
+			else:
+				
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
 #################################
 localrules: Final, Transfer
 #################################
@@ -78,12 +86,33 @@ rule Final:
 	shell: """
 	############################
 	touch "{INPUT}{FCID}/bcl2fastq.done"
-	#chgrp -R store-mocha {OUTPUT}{FCID}/
-	cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-	/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
-	#/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" dabdccc3-6d04-11e5-ba46-22000b92c6ec: e2620047-6d04-11e5-ba46-22000b92c6ec:/data/MoCha/DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
-	
+	if [ {params.project} != 'TST500' ]; then
+		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
+		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+	fi
 	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov
+	############################
+	"""
+#################################
+# Transfer Data to S3 Bucket
+#################################
+rule s3cmd:
+	input:
+		OUTPUT+FCID+"/Reports/html/tree.html",
+	output:
+		OUTPUT+FCID+"/{sample}.transfer.done"
+	params:
+		rulename = "s3cmd",
+		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+	shell: """
+	############################
+	R1=`find {OUTPUT}{FCID}/ -name "*{wildcards.sample}*_R1_*"`
+	name=`basename ${{R1}}`
+	~/s3cmd-2.0.1/s3cmd put --multipart-chunk-size-mb=2000 -H ${{R1}} s3://mocha-illumina/{FCID}/${{name}}
+	R2=`find {OUTPUT}{FCID}/ -name "*{wildcards.sample}*_R2_*"`
+	name=`basename ${{R2}}`
+	~/s3cmd-2.0.1/s3cmd put --multipart-chunk-size-mb=2000 -H ${{R2}} s3://mocha-illumina/{FCID}/${{name}}
+	touch {output}	
 	############################
 	"""
 #################################
@@ -187,14 +216,16 @@ rule BCL2FASTQ:
 		OUTPUT+FCID+"/Reports/html/tree.html"
 	params:
 		rulename = "bcl2fastq",
+		project  = PROJECT,
 		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=72gb,ncpus=16"
 	shell: """
 	############################
-	#module load bcl2fastq2
-	#/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ 
-	/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting
-	cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv
-	dos2unix {OUTPUT}/{FCID}/SampleSheet.csv
-	#chgrp -R store-mocha {OUTPUT}{FCID}/
+	if [ {params.project} == 'TST500' ]; then
+		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35
+	else
+		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16
+		cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv
+		dos2unix {OUTPUT}/{FCID}/SampleSheet.csv
+	fi
 	############################
 	"""
