@@ -82,6 +82,7 @@ rule Final:
 		OUTPUT+FCID+"/Reports/html/tree.html"
 	params:
 		rulename = "Final",
+		project  = PROJECT,
 		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
 	shell: """
 	############################
@@ -224,8 +225,8 @@ rule BCL2FASTQ:
 		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35
 	else
 		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16
-		cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv
-		dos2unix {OUTPUT}/{FCID}/SampleSheet.csv
 	fi
+	cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv
+	dos2unix {OUTPUT}/{FCID}/SampleSheet.csv
 	############################
 	"""
