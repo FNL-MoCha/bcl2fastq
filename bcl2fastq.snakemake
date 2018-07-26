@@ -70,7 +70,7 @@ for line in f:
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
 #################################
-localrules: Final, Transfer
+localrules: Final, Transfer, Merge
 #################################
 # Parse html pages and send report email.
 #################################
@@ -91,7 +91,7 @@ rule Final:
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
 		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
 	fi
-	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov
+	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov
 	############################
 	"""
 #################################
@@ -165,9 +165,13 @@ rule Transfer:
 	if [[ ${{project}} = 'PDX' ]]; then
 		if  [[ ${{type}} = 'RNASEQ' ]] ; then
 			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} RNA`
-			
-			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
-			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+			depth=`grep -A2 {wildcards.library} {OUTPUT}/{FCID}/Reports/html/{FCName}/all/all/all/laneBarcode.html|tail -n1|cut -f2 -d">"|cut -f1 -d"<"|sed -e 's/,//g'`
+			if [ $lines  -gt 35000000 ]; then
+				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+			else
+				touch {OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
+			fi
 		else
 			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} DNA`
 			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt

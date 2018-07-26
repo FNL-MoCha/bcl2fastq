@@ -45,3 +45,7 @@ snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake --dryrun
 
 
 END
+
+#qsub -N CB9CLANXX -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/170824_D00748_0099_BCB9CLANXX ~/bcl2fastq.v2/submit_snakemake.sh
+#qsub -N CCKGTANXX -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/180703_D00717_0102_ACCKGTANXX ~/bcl2fastq.v2/submit_snakemake.sh
+#qsub -N CCKPVANXX -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/180703_D00717_0103_BCCKPVANXX ~/bcl2fastq.v2/submit_snakemake.sh

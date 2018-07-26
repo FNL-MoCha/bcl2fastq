@@ -103,7 +103,7 @@ sub getSampleInfo{
 			}
 	}
 	close FH1;
-	unlink $fastq_dir."/".$run_name."/count.txt";
+	#unlink $fastq_dir."/".$run_name."/count.txt";
 	$index_distribution_html = "<p> <h2>Reads by Sample</h2>\n<table border=\"1\">\n<tr><th>SampleID</th><th>Sample Name</th><th>PF Clusters</th><th>% of the sample</th></tr>\n";
 	my $total=0;
 	foreach (values %sample_reads_count){
@@ -111,11 +111,41 @@ sub getSampleInfo{
 	}
 
 	foreach my $key (sort keys %sample_reads_count){
+		my $sample=getPDXID($key);
+		#print "$sample\n";
 		my $pct=sprintf("%.2f",$sample_reads_count{$key}/$total*100);
 		$sample_reads_count{$key} =~ s/(\d)(?=(\d{3})+(\D|$))/$1\,/g;
-		$index_distribution_html .= "<tr><td>$ID_NAME{$key}</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct</td></tr>\n";
+		my $tmp = $sample_reads_count{$key};
+		$tmp=~ s/,//g;
+		if($sample=~/^PD/){
+			$sample="<font color=\"red\">$sample</font>";
+		}
+		if($tmp > 35000000){
+			$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct</td></tr>\n";
+		}
+		else{
+			$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct <font color=\"red\">FAILED</font></td></tr>\n";
+		}
 	}
 	$index_distribution_html .= "</table></p>\n";
 	$index_distribution_html .= "<p><br><br><br>Thanks,<br>Bioinformatics Team<br>MoCha</p>\n";
 	return $index_distribution_html;
+}
+
+
+sub getPDXID{
+	my ($sample)=@_;
+	unless (open(FH, $ARGV[3])){
+                print STDERR "Can not open $ARGV[3]\n";
+                exit;
+        }
+	while(<FH>){
+		chomp;
+		my @a=split("\t",$_);
+		if($a[2] =~$sample and $a[9] =~/$run_id/){
+			$sample=$a[6];
+			next;
+		}
+	}
+	return($sample);
 }

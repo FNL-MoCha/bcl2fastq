@@ -29,7 +29,8 @@ while(readdir $DH){
 				# Already processed or job running.
 				# Finished in last month
 			}
-			elsif (-M "$DIR/$line/RTAComplete.txt" <15){
+			#elsif (-d "$DIR/180703_D00717_0102_ACCKGTANXX"){
+			elsif (-M "$DIR/$line/RTAComplete.txt" <5){
 				`mkdir -p $OUTDIR/$MONTH/$line`;
 				#print "/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$line\" $PIPELINE/submit_snakemake.sh\n";
 				if (`less "$DIR/$line/SampleSheet.csv"`){
@@ -38,6 +39,7 @@ while(readdir $DH){
 					# which should remove this file at the end
 					#print "I could have started on this $line\n";
 					`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line" $PIPELINE/submit_snakemake.sh`;
+					#print "/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=$DIR/$line $PIPELINE/submit_snakemake.sh\n";
 					exit;
 				}
 				else{
@@ -63,7 +65,7 @@ while(readdir $DH){
 					if (-e "$OUTDIR/$MONTH/$nova" or -e "$DIR/$line/$nova/bcl2fastq.done"){
 					}
 					elsif (-M "$DIR/$line/$nova/CopyComplete.txt" <5){
-						if (`less "$DIR/$line/$nova/SampleSheet.csv"`){
+						if ( -e  "$DIR/$line/$nova/SampleSheet.csv"){
 							#print "`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$DIR/$line/$nova\" $PIPELINE/submit_snakemake.sh`\n";
 							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line/$nova" $PIPELINE/submit_snakemake.sh`;
 							exit;
