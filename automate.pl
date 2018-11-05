@@ -30,17 +30,16 @@ while(readdir $DH){
 				# Finished in last month
 			}
 			#elsif (-d "$DIR/180703_D00717_0102_ACCKGTANXX"){
-			elsif (-M "$DIR/$line/RTAComplete.txt" <5){
+			elsif (-M "$DIR/$line/RTAComplete.txt" <15){
 				`mkdir -p $OUTDIR/$MONTH/$line`;
-				#print "/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$line\" $PIPELINE/submit_snakemake.sh\n";
-				if (`less "$DIR/$line/SampleSheet.csv"`){
-					# Make a file we need to check the next time
-					# launch snakemake pipeline to launch bcl2fastq
-					# which should remove this file at the end
-					#print "I could have started on this $line\n";
+				if (-e "$DIR/$line/SampleSheet.csv"){
 					`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line" $PIPELINE/submit_snakemake.sh`;
 					#print "/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=$DIR/$line $PIPELINE/submit_snakemake.sh\n";
 					exit;
+				}
+				elsif(-e "$DIR/$line/$FCID.csv"){
+					`cp -rf "$DIR/$line/$FCID.csv" "$DIR/$line/SampleSheet.csv"`;
+					`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line" $PIPELINE/submit_snakemake.sh`;
 				}
 				else{
 					`echo "I don't have permissions to read $DIR/$line/SampleSheet.csv" |mutt -s "bcl2fastq error" patidarr\@mail.nih.gov`;
@@ -71,7 +70,7 @@ while(readdir $DH){
 							exit;
 						}
 						elsif( -e "$DIR/$line/$nova/$FCID.csv"){
-							`cp "$DIR/$line/$nova/$FCID.csv" "$DIR/$line/$nova/SampleSheet.csv"`;
+							`cp -rf "$DIR/$line/$nova/$FCID.csv" "$DIR/$line/$nova/SampleSheet.csv"`;
 							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line/$nova" $PIPELINE/submit_snakemake.sh`;
 							exit;
 						}

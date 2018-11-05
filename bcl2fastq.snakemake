@@ -77,7 +77,6 @@ localrules: Final, Transfer, Merge
 #
 rule Final:
 	input: 
-		#INPUT+FCID+"/archive.txt",
 		TARGETS,
 		OUTPUT+FCID+"/Reports/html/tree.html"
 	params:
@@ -90,14 +89,21 @@ rule Final:
 	if [ {params.project} != 'TST500' ]; then
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
 		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+	else
+		#cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
+		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >{OUTPUT}{FCID}/globus.biowulf.txt
+		task_id=$(/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
+		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
+		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
+		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMP_sample.sh {FCID} --launch"
 	fi
-	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov
+	#{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov
 	############################
 	"""
 #################################
 # Transfer Data to S3 Bucket
 #################################
-rule s3cmd:
+rule TST500:
 	input:
 		OUTPUT+FCID+"/Reports/html/tree.html",
 	output:
@@ -107,37 +113,12 @@ rule s3cmd:
 		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
 	shell: """
 	############################
-	R1=`find {OUTPUT}{FCID}/ -name "*{wildcards.sample}*_R1_*"`
-	name=`basename ${{R1}}`
-	~/s3cmd-2.0.1/s3cmd put --multipart-chunk-size-mb=2000 -H ${{R1}} s3://mocha-illumina/{FCID}/${{name}}
-	R2=`find {OUTPUT}{FCID}/ -name "*{wildcards.sample}*_R2_*"`
-	name=`basename ${{R2}}`
-	~/s3cmd-2.0.1/s3cmd put --multipart-chunk-size-mb=2000 -H ${{R2}} s3://mocha-illumina/{FCID}/${{name}}
-	touch {output}	
-	############################
-	"""
-#################################
-# Archive Data
-#################################
-rule Archive:
-	input:
-		OUTPUT+FCID+"/Reports/html/tree.html",
-		TARGETS
-	output:
-		INPUT+FCID+"/archive.txt"
-	params:
-		rulename = "Archive",
-		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
-	shell: """
-	############################
-	mkdir -p {INPUT}{FCID}/FASTQ/
-	cp -rf {OUTPUT}{FCID}/* {INPUT}{FCID}/FASTQ/
-	
-	tar -cvf /projects/lihc_hiseq/scratch/backup/{FCID}.tar {INPUT}{FCID}
-	md5sum /projects/lihc_hiseq/scratch/backup/{FCID}.tar >/projects/lihc_hiseq/scratch/backup/{FCID}.tar.md5
-	rsync -av /projects/lihc_hiseq/scratch/backup/{FCID}.tar fr-s-bacula-1.ncifcrf.gov:/dmf/archive/projects/lihc_hiseq/archive/lihc_hiseq_static_dir_archive
-	rsync -av /projects/lihc_hiseq/scratch/backup/{FCID}.tar.md5 fr-s-bacula-1.ncifcrf.gov:/dmf/archive/projects/lihc_hiseq/archive/lihc_hiseq_static_dir_archive
-	echo "Archive Completed" >{output}
+	cd {OUTPUT}/../
+	R1=`find {MONTH}/{FCID}/ -name "*{wildcards.sample}*_R1_*"`
+	R2=`find {MONTH}/{FCID}/ -name "*{wildcards.sample}*_R2_*"`
+	file=`basename ${{R1}} _R1_001.fastq.gz`
+	echo "${{R1}} {FCID}/${{file}}_R1_001.fastq.gz" >{output}
+	echo "${{R2}} {FCID}/${{file}}_R2_001.fastq.gz" >>{output}
 	############################
 	"""
 #################################
@@ -165,8 +146,8 @@ rule Transfer:
 	if [[ ${{project}} = 'PDX' ]]; then
 		if  [[ ${{type}} = 'RNASEQ' ]] ; then
 			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} RNA`
-			depth=`grep -A2 {wildcards.library} {OUTPUT}/{FCID}/Reports/html/{FCName}/all/all/all/laneBarcode.html|tail -n1|cut -f2 -d">"|cut -f1 -d"<"|sed -e 's/,//g'`
-			if [ $lines  -gt 35000000 ]; then
+			depth=`grep -A2 {wildcards.library} {OUTPUT}/{FCID}/Reports/html/{FCName}/all/all/all/laneBarcode.html|cut -f2 -d">"|cut -f1 -d"<" |grep ","|sed -e 's/,//g'|awk '{{ sum += $1 }} END {{ print sum }}'`
+			if [ ${{depth}}  -gt 35000000 ]; then
 				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 			else
@@ -226,7 +207,7 @@ rule BCL2FASTQ:
 	shell: """
 	############################
 	if [ {params.project} == 'TST500' ]; then
-		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35
+		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35 --barcode-mismatches 0
 	else
 		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16
 	fi

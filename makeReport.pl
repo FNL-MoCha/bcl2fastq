@@ -120,7 +120,7 @@ sub getSampleInfo{
 		if($sample=~/^PD/){
 			$sample="<font color=\"red\">$sample</font>";
 		}
-		if($tmp > 35000000){
+		if($tmp > 20000000){
 			$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct</td></tr>\n";
 		}
 		else{
