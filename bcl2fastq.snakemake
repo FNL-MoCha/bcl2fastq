@@ -18,6 +18,7 @@ SOURCE=os.environ['SOURCE']
 INPUT=os.environ['INPUT']
 OUTPUT=os.environ['OUTPUT']
 MONTH=os.environ['MONTH']
+OUTPUT=OUTPUT+MONTH+"/"
 # Snakemake Base location
 shell.prefix("""
 #PBS -S /bin/bash
@@ -30,13 +31,17 @@ path=TARGET.split("/")
 PATH=os.path.dirname(TARGET)
 FCID=path[-2]
 #onstart:
+#	shell("cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv")
+#	shell("dos2unix {OUTPUT}{FCID}/SampleSheet.csv")
+#	shell("{SOURCE}/fixSampleSheet.pl {OUTPUT}{FCID}/SampleSheet.csv >{OUTPUT}{FCID}/SampleSheet.fixed.csv")
+#	shell("mv -f {OUTPUT}{FCID}/SampleSheet.fixed.csv {OUTPUT}{FCID}/SampleSheet.csv")
 #	shell("echo 'bcl2fastq conversion started {FCID} '| mutt -s 'bcl2fastq status ' `whoami`@mail.nih.gov ")
 onerror:
 	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov ")
 #onsuccess:
 #	shell("echo 'bcl2fastq pipeline finished successfully on {FCID} ' |mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov  ")
 
-f = open(PATH+"/SampleSheet.csv", 'r')
+f = open(OUTPUT+"/"+FCID+"/SampleSheet.csv", 'r')
 FCName=FCID.split("_")
 FCName=FCName[-1][1:]
 TARGETS = []
@@ -45,7 +50,6 @@ TARGETS = []
 #
 #
 PROJECT="Other"
-OUTPUT=OUTPUT+MONTH+"/"
 for line in f:
 	line = line.rstrip()
 	if 'Sample_ID' in line: 
@@ -90,14 +94,14 @@ rule Final:
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
 		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
 	else
-		#cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
-		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >{OUTPUT}{FCID}/globus.biowulf.txt
+		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
+		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
 		task_id=$(/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMP_sample.sh {FCID} --launch"
 	fi
-	#{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov
+	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov
 	############################
 	"""
 #################################
@@ -147,7 +151,7 @@ rule Transfer:
 		if  [[ ${{type}} = 'RNASEQ' ]] ; then
 			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} RNA`
 			depth=`grep -A2 {wildcards.library} {OUTPUT}/{FCID}/Reports/html/{FCName}/all/all/all/laneBarcode.html|cut -f2 -d">"|cut -f1 -d"<" |grep ","|sed -e 's/,//g'|awk '{{ sum += $1 }} END {{ print sum }}'`
-			if [ ${{depth}}  -gt 35000000 ]; then
+			if [ ${{depth}}  -gt 20000000 ]; then
 				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 			else
@@ -207,11 +211,9 @@ rule BCL2FASTQ:
 	shell: """
 	############################
 	if [ {params.project} == 'TST500' ]; then
-		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35 --barcode-mismatches 0
+		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35 --barcode-mismatches 0 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
 	else
-		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16
+		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
 	fi
-	cp {INPUT}/{FCID}/SampleSheet.csv {OUTPUT}{FCID}/SampleSheet.csv
-	dos2unix {OUTPUT}/{FCID}/SampleSheet.csv
 	############################
 	"""

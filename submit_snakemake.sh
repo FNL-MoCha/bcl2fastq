@@ -1,10 +1,12 @@
 #!/bin/bash
 #PBS -S /bin/bash
+set -eo pipefail
 source /etc/profile.d/modules.sh
 time=`date +"%Y%m%d_%H%M%S"`
 module load snakemake
 NOW=$(date +"%Y_%B")
 input=`dirname $target`
+FCID=`basename $target`
 export TARGET="$target/bcl2fastq.done"
 export INPUT="$input/"
 export SOURCE="/users/n2000747426/patidarr/bcl2fastq.v2/"
@@ -12,6 +14,16 @@ export OUTPUT="/projects/lihc_hiseq/scratch/BW_transfers/"
 export MONTH="$NOW"
 log="/users/n2000747426/patidarr/log/"
 mkdir -p $log
+
+
+mkdir -p ${OUTPUT}/${MONTH}/${FCID}
+
+cp ${INPUT}/${FCID}/SampleSheet.csv ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
+dos2unix ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
+${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
+mv -f ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
+
+
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
 	--nolock  --ri -k -p -T -r -j 3000\
 	--jobname {params.rulename}.{jobid}\
@@ -24,6 +36,7 @@ snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
 
 : <<'END'
 RUN=''
+
 module load snakemake
 NOW=$(date +"%Y_%B")
 export MONTH="$NOW"
@@ -31,7 +44,14 @@ export INPUT="/projects/lihc_hiseq/static/"
 export OUTPUT="/projects/lihc_hiseq/scratch/BW_transfers/"
 export TARGET="/projects/lihc_hiseq/static/$RUN/bcl2fastq.done"
 export SOURCE="/users/n2000747426/patidarr/bcl2fastq.v2/"
+mkdir -p ${OUTPUT}/${MONTH}/${RUN}/
+cp ${INPUT}/${RUN}/SampleSheet.csv ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
+dos2unix ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
+${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv >${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv
+mv -f ${OUTPUT}/${MONTH}/${RUN}SampleSheet.fixed.csv ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake --dryrun
+qsub -N ${RUN} -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/{$RUN} ~/bcl2fastq.v2/submit_snakemake.sh
+
 
 RUN=''
 module load snakemake
@@ -41,7 +61,13 @@ export INPUT="/projects/lihc_hiseq/static/NovaSeq/"
 export OUTPUT="/projects/lihc_hiseq/scratch/BW_transfers/"
 export TARGET="/projects/lihc_hiseq/static/NovaSeq/$RUN/bcl2fastq.done"
 export SOURCE="/users/n2000747426/patidarr/bcl2fastq.v2/"
+mkdir -p ${OUTPUT}/${MONTH}/${RUN}/
+cp ${INPUT}//${RUN}/SampleSheet.csv ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
+dos2unix ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
+${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv >${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake --dryrun
+
+qsub -N ${RUN} -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/NovaSeq/{$RUN} ~/bcl2fastq.v2/submit_snakemake.sh
 
 
 END

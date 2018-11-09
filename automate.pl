@@ -40,6 +40,7 @@ while(readdir $DH){
 				elsif(-e "$DIR/$line/$FCID.csv"){
 					`cp -rf "$DIR/$line/$FCID.csv" "$DIR/$line/SampleSheet.csv"`;
 					`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line" $PIPELINE/submit_snakemake.sh`;
+					#print "/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$DIR/$line\" $PIPELINE/submit_snakemake.sh\n";
 				}
 				else{
 					`echo "I don't have permissions to read $DIR/$line/SampleSheet.csv" |mutt -s "bcl2fastq error" patidarr\@mail.nih.gov`;
@@ -65,13 +66,14 @@ while(readdir $DH){
 					}
 					elsif (-M "$DIR/$line/$nova/CopyComplete.txt" <5){
 						if ( -e  "$DIR/$line/$nova/SampleSheet.csv"){
-							#print "`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$DIR/$line/$nova\" $PIPELINE/submit_snakemake.sh`\n";
-							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line/$nova" $PIPELINE/submit_snakemake.sh`;
+							#print "`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$DIR$line/$nova\" $PIPELINE/submit_snakemake.sh`\n";
+							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR$line/$nova" $PIPELINE/submit_snakemake.sh`;
 							exit;
 						}
 						elsif( -e "$DIR/$line/$nova/$FCID.csv"){
 							`cp -rf "$DIR/$line/$nova/$FCID.csv" "$DIR/$line/$nova/SampleSheet.csv"`;
-							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line/$nova" $PIPELINE/submit_snakemake.sh`;
+							#print "/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target=\"$DIR$line/$nova\" $PIPELINE/submit_snakemake.sh\n";
+							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR$line/$nova" $PIPELINE/submit_snakemake.sh`;
 							exit;
 						}
 						else{
