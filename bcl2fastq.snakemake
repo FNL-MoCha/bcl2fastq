@@ -54,10 +54,12 @@ for line in f:
 	line = line.rstrip()
 	if 'Sample_ID' in line: 
 		column = line.split(",")
-		sampleName  =column.index('Sample_Name')
+		if 'Sample_Name' in line:
+			sampleName  =column.index('Sample_Name')
 		sampleID  =column.index('Sample_ID')
 		project	    =column.index('Sample_Project')
-		desc     =column.index('Description')
+		if 'Description' in line:
+			desc     =column.index('Description')
 		for line in f:
 			line = line.rstrip()
 			column = line.split(",")
@@ -65,9 +67,13 @@ for line in f:
 				if ' ' in vals:
 					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov")
 					exit()
-			if column[desc] == 'TST500':
+			if 'Description' in line and column[desc] == 'TST500':
+				#if column[desc] == 'TST500':
 				PROJECT= 'TST500'
 				TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
+			elif '10X'.lower() in column[project].lower():
+				PROJECT= '10X'
+				#TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
 			else:
 				
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
@@ -92,16 +98,16 @@ rule Final:
 	touch "{INPUT}{FCID}/bcl2fastq.done"
 	if [ {params.project} != 'TST500' ]; then
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+		$HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
 	else
 		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
 		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
-		task_id=$(/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
+		task_id=$($HOME/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
-		/users/n2000747426/patidarr/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
+		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMP_sample.sh {FCID} --launch"
 	fi
-	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov
+	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov -c anna.leefong@nih.gov
 	############################
 	"""
 #################################
@@ -212,6 +218,11 @@ rule BCL2FASTQ:
 	############################
 	if [ {params.project} == 'TST500' ]; then
 		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --mask-short-adapter-reads 35 --barcode-mismatches 0 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
+	elif [ {params.project} == '10X' ]; then
+		module load cellranger
+		module load bcl2fastq2
+		cd {OUTPUT}{FCID}/
+		cellranger mkfastq --id=10X --run={INPUT}{FCID} --csv={OUTPUT}{FCID}/SampleSheet.fixed.csv --output-dir={OUTPUT}{FCID}/ --localcores=16 --localmem=70 --jobmode=local
 	else
 		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
 	fi

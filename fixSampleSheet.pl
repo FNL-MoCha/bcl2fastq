@@ -7,9 +7,15 @@ my $head1 = <$fh>;
 $/="\n";
 
 my $head2 = <$fh>;  
-print "$head1"."$head2";
+if(defined $ARGV[1] and $ARGV[1] =~ /^10X$/){
+	#Nothing to do
+}
+else{
+	print "$head1"."$head2";
+}
 
 my ($type, $lane, $id, $name, $I7_Index_ID, $index,$I5_Index_ID , $index2, $project, $desc, $note);
+
 
 while (my $row = <$fh>) {
 	chomp $row;
@@ -27,6 +33,10 @@ while (my $row = <$fh>) {
 		$project        = first { $a[$_] eq 'Sample_Project' } 0..$#a;
 		$desc           = first { $a[$_] eq 'Description' } 0..$#a;
 		$note           = first { $a[$_] eq 'Notes' } 0..$#a;
+		if(defined $ARGV[1] and $ARGV[1] =~ /^10X$/){
+			print "Lane,Sample,Index\n";
+			next;
+		}
 		if ($row =~/I5_Index_ID/){
 			$type="dual";
 			print "Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description,Notes\n";
@@ -37,6 +47,10 @@ while (my $row = <$fh>) {
 		}
 	}
 	else{
+		if(defined $ARGV[1] and $ARGV[1] =~ /^10X$/){
+			print "$a[$lane],$a[$id],$a[$index]\n";
+			next;
+		}
 		if ($row =~ /TST500/){
 			print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],\n";
 		}
@@ -45,11 +59,11 @@ while (my $row = <$fh>) {
 				print "$row\n";
 				exit;
 			}
-			if($a[$id] =~ /UHR/ or $a[$id] =~ /HBR/){
+			if($row =~ /control/i or $a[$id] =~ /UHR/ or $a[$id] =~ /HBR/ or $a[$id] =~ /CEPH/ or $a[$id] =~ /HAP/){
 				print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 				next;
 			}
-			if ($a[$id] =~ /([RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
+			if ($a[$id] =~ /([HDR|PAD|RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
 				print "$a[$lane],$1,$1,$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 			}
 			else{
@@ -61,11 +75,11 @@ while (my $row = <$fh>) {
 				print "$row\n";
 				exit;
 			}
-			if($a[$id] =~ /UHR/ or $a[$id] =~ /HBR/){
+			if($row =~ /control/i or $a[$id] =~ /UHR/ or $a[$id] =~ /HBR/ or $a[$id] =~ /CEPH/ or $a[$id] =~ /HAP/){
 				print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$project],$a[$desc],$a[$note]\n";
 				next;
 			}
-			if ($a[$id] =~ /([RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
+			if ($a[$id] =~ /([HDR|PAD|RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
 				print "$a[$lane],$1,$1,$a[$I7_Index_ID],$a[$index],$a[$project],$a[$desc],$a[$note]\n";
 			}
 			else{

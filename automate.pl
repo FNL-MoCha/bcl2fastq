@@ -7,8 +7,9 @@ use warnings;
 #	 count # reads in files [Done]
 # 	 copy data to biowulf and any other location it should get copied over to [Done]
 # 	 send email notification [Done]
-my $LOG="/users/n2000747426/patidarr/log/";
-my $PIPELINE="/users/n2000747426/patidarr/bcl2fastq.v2/";
+my $HOME="/home/patidarr";
+my $LOG="$HOME/log/";
+my $PIPELINE="$HOME/bcl2fastq.v2/";
 my $DIR = "/projects/lihc_hiseq/static/";
 my $OUTDIR = "/projects/lihc_hiseq/scratch/BW_transfers/";
 my $MONTH=`echo \$(date +"%Y_%B")`;
@@ -30,7 +31,7 @@ while(readdir $DH){
 				# Finished in last month
 			}
 			#elsif (-d "$DIR/180703_D00717_0102_ACCKGTANXX"){
-			elsif (-M "$DIR/$line/RTAComplete.txt" <15){
+			elsif (-M "$DIR/$line/RTAComplete.txt" <25){
 				`mkdir -p $OUTDIR/$MONTH/$line`;
 				if (-e "$DIR/$line/SampleSheet.csv"){
 					`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR/$line" $PIPELINE/submit_snakemake.sh`;

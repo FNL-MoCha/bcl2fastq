@@ -2,6 +2,7 @@
 use List::Util qw(first);
 #local $SIG{__WARN__} = sub {my $message =shift; die $message;};
 # ./makeReport.pl /projects/lihc_hiseq/static/ 170905_D00717_0062_AHTW7FBCXY/Unaligned HTW7FBCXY |mutt -e "my_hdr Content-Type: text/html" -s "test" patidarr@mail.nih.gov
+# /home/patidarr/bcl2fastq.v2/makeReport.pl /projects/lihc_hiseq/scratch/BW_transfers/2019_January/ 181226_D00748_0163_ACD1ALANXX CD1ALANXX ~/bcl2fastq.v2/Master.txt mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on 181226_D00748_0163_ACD1ALANXX" patidarr@mail.nih.gov
 
 my $fastq_dir=$ARGV[0];
 my $run_name=$ARGV[1];
@@ -15,9 +16,17 @@ fetch_index();
 my $index = getSampleInfo();
 print "$head\n$stats\n$index\n";
 sub header{
-	my $string = "<p>Hello,<br><br>Here is the summary of this run:<br></p>\n";	
+	my $exp=fetch_exp();
+	my $string = "<p>Hello,<br><br>Here is the summary of this run, generated from Assay Req $exp:<br></p>\n";	
 	return $string;
 }
+sub fetch_exp{
+	my $csv=$fastq_dir."/".$run_name."/SampleSheet.csv";
+	my $info= `grep "Experiment" $csv|sed -e 's/ExperimentName,//g'|sed -e 's/,//g'`;
+	chomp $info;
+	return $info;
+}
+
 sub fetch_stats{
 	my $html = $fastq_dir."/".$run_name."/Reports/html/".$run_id."/all/all/all/lane.html";
 	unless (open (IN,"$html")){
@@ -124,7 +133,12 @@ sub getSampleInfo{
 			$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct</td></tr>\n";
 		}
 		else{
-			$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct <font color=\"red\">FAILED</font></td></tr>\n";
+			if($sample =~ /PDA/){
+				$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct <font color=\"red\">FAILED</font></td></tr>\n";
+			}
+			else{
+				$index_distribution_html .= "<tr><td>$sample</td><td>$key</td><td>$sample_reads_count{$key}</td><td>$pct </td></tr>\n";
+			}
 		}
 	}
 	$index_distribution_html .= "</table></p>\n";
