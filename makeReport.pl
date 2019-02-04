@@ -17,7 +17,7 @@ my $index = getSampleInfo();
 print "$head\n$stats\n$index\n";
 sub header{
 	my $exp=fetch_exp();
-	my $string = "<p>Hello,<br><br>Here is the summary of this run, generated from Assay Req $exp:<br></p>\n";	
+	my $string = "<p>Hello,<br><br>Here is the summary of this run, generated from Assay Req: <b><font size=\"3\" color=\"red\">$exp</font></b><br></p>\n";	
 	return $string;
 }
 sub fetch_exp{

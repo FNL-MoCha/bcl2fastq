@@ -67,13 +67,18 @@ for line in f:
 				if ' ' in vals:
 					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov")
 					exit()
-			if 'Description' in line and column[desc] == 'TST500':
+			if column[desc] == 'TST500':
 				#if column[desc] == 'TST500':
 				PROJECT= 'TST500'
 				TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
 			elif '10X'.lower() in column[project].lower():
 				PROJECT= '10X'
-				#TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
+				TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".10X.done"]
+			elif 'shallowseq' in column[project].lower():
+				PROJECT= 'shallowseq'
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
 			else:
 				
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
@@ -96,22 +101,54 @@ rule Final:
 	shell: """
 	############################
 	touch "{INPUT}{FCID}/bcl2fastq.done"
-	if [ {params.project} != 'TST500' ]; then
+	if [ {params.project} == 'shallowseq'  ]; then
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-		$HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
-	else
+		task_id=$($HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
+		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
+		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
+		ssh -q biowulf.nih.gov "cd /data/MoCha/ShallowSeq/; sh launchShallowSeq.sh {FCID}"
+	elif [ {params.project} == 'TST500'  ]; then
 		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
 		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
 		task_id=$($HOME/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMP_sample.sh {FCID} --launch"
+	elif [ {params.project} == '10X' ]; then
+		# Do nothing; no need to transfer anything to biowulf
+	else
+		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
+		$HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
 	fi
 	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov -c anna.leefong@nih.gov
 	############################
 	"""
 #################################
-# Transfer Data to S3 Bucket
+# Single Cell Count for 10X genomics
+#################################
+rule X10X:
+	input:
+		OUTPUT+FCID+"/Reports/html/tree.html"
+	output:
+		OUTPUT+FCID+"/{sample}.10X.done"
+	params:
+		rulename = "10X",
+		batch    = "-l nodes=1:ppn=16,walltime=700:00:00,pvmem=64gb"
+	shell: """
+	############################
+        module load cellranger
+        module load bcl2fastq2
+	mkdir -p {OUTPUT}/{FCID}/{FCName}/{wildcards.sample}	
+	cd {OUTPUT}/{FCID}/{FCName}/{wildcards.sample}
+        cellranger count --id={wildcards.sample}\
+		 --fastqs={OUTPUT}/{FCID}/{FCName}/\
+		 --transcriptome=/projects/lihc_hiseq/scratch/BW_transfers/SingleCellSeq/refdata-cellranger-GRCh38-1.2.0/\
+		 --jobmode=local --localcores=16\
+		 --sample={wildcards.sample} --localmem=64  >{OUTPUT}/{FCID}/{wildcards.sample}.10X.done
+	############################
+	"""
+#################################
+# Make globus input for the TST500 Run
 #################################
 rule TST500:
 	input:

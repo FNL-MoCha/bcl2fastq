@@ -52,7 +52,7 @@ while (my $row = <$fh>) {
 			next;
 		}
 		if ($row =~ /TST500/){
-			print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],\n";
+			print "$a[$lane],$a[$id],$a[$id],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 		}
 		elsif ($type =~ /dual/){
 			if($row !~ /[A-Za-z0-9_-]/){
