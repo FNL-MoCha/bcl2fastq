@@ -63,7 +63,7 @@ while (my $row = <$fh>) {
 				print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 				next;
 			}
-			if ($a[$id] =~ /([HDR|PAD|RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
+			if ($a[$id] =~ /([MPT|HDR|PAD|RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
 				print "$a[$lane],$1,$1,$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 			}
 			else{
@@ -79,7 +79,7 @@ while (my $row = <$fh>) {
 				print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$project],$a[$desc],$a[$note]\n";
 				next;
 			}
-			if ($a[$id] =~ /([HDR|PAD|RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
+			if ($a[$id] =~ /([MPT|HDR|PAD|RND|PDA|PDC].*)_([R|r]ep[A|B|C|D])/){
 				print "$a[$lane],$1,$1,$a[$I7_Index_ID],$a[$index],$a[$project],$a[$desc],$a[$note]\n";
 			}
 			else{

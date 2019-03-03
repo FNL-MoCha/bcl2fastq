@@ -107,6 +107,7 @@ rule Final:
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/ShallowSeq/; sh launchShallowSeq.sh {FCID}"
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c robin.harrington@nih.gov -c nikitha.nair@nih.gov -c tomas.vilimas@nih.gov
 	elif [ {params.project} == 'TST500'  ]; then
 		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
 		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
@@ -114,13 +115,16 @@ rule Final:
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMP_sample.sh {FCID} --launch"
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c erin.mosher@nih.gov -c maria.saeed@nih.gov -c tomas.vilimas@nih.gov
 	elif [ {params.project} == '10X' ]; then
-		# Do nothing; no need to transfer anything to biowulf
+		echo "# Do nothing; no need to transfer anything to biowulf"
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c brandie.fullmer@nih.gov -c tomas.vilimas@nih.gov
+	
 	else
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
 		$HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov -c anna.leefong@nih.gov
 	fi
-	{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov -c anna.leefong@nih.gov
 	############################
 	"""
 #################################
@@ -161,8 +165,8 @@ rule TST500:
 	shell: """
 	############################
 	cd {OUTPUT}/../
-	R1=`find {MONTH}/{FCID}/ -name "*{wildcards.sample}*_R1_*"`
-	R2=`find {MONTH}/{FCID}/ -name "*{wildcards.sample}*_R2_*"`
+	R1=`find {MONTH}/{FCID}/ -name "*{wildcards.sample}_S*_R1_*"`
+	R2=`find {MONTH}/{FCID}/ -name "*{wildcards.sample}_S*_R2_*"`
 	file=`basename ${{R1}} _R1_001.fastq.gz`
 	echo "${{R1}} {FCID}/${{file}}_R1_001.fastq.gz" >{output}
 	echo "${{R2}} {FCID}/${{file}}_R2_001.fastq.gz" >>{output}
@@ -233,7 +237,7 @@ rule Merge:
 	search=`echo ${{string}} |cut -d ' ' -f2`
 	type=`echo ${{string}} |cut -d ' ' -f3`
 	project=`echo ${{string}} |cut -d ' ' -f4`
-	R1=`find {OUTPUT}/{FCID}/ -name "${{search}}*?_R1_001.fastq.gz"|sort| tr '\\n' ' '`
+	R1=`find {OUTPUT}/{FCID}/ -name "${{search}}_S*_R1_001.fastq.gz"|sort| tr '\\n' ' '`
 	mv ${{R1}} {output.R1}
 	R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
 	mv ${{R2}} {output.R2}
