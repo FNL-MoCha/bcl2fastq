@@ -47,8 +47,16 @@ while (my $row = <$fh>) {
 		}
 	}
 	else{
+		if(! defined $a[$id]){
+			next;
+		}
 		if(defined $ARGV[1] and $ARGV[1] =~ /^10X$/){
-			print "$a[$lane],$a[$id],$a[$index]\n";
+			if($a[$lane] =~ /\d+/){
+				print "$a[$lane],$a[$id],$a[$index]\n";
+			}
+			else{
+				print "*,$a[$id],$a[$index]\n";
+			}
 			next;
 		}
 		if ($row =~ /TST500/){

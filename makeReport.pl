@@ -70,17 +70,20 @@ sub getSampleID{
                 print STDERR "Can not open $fastq_dir/$run_name/SampleSheet.csv\n";
                 exit;
         }
-        my $idxName = 0;
-        my $idxID   = 1;
+        my $idxName = 1;
+        my $idxID   = 0;
         while(<FH>){
                 chomp;
                 next if 1 .. /Data/;
                 my @format = split(",", $_);
                 if ($_ =~ /Sample_ID/){
                         $idxID   = first { $format[$_] eq 'Sample_ID' } 0..$#format;
-                        $idxName = first { $format[$_] eq 'Sample_Name' } 0..$#format;
+			$ID_NAME{$format[$idxID]} = $format[$idxID];
                 }
-                $ID_NAME{$format[$idxName]} = $format[$idxID];
+		if ($_ =~ /Sample_Name/){
+			$idxName = first { $format[$_] eq 'Sample_Name' } 0..$#format;
+			$ID_NAME{$format[$idxName]} = $format[$idxID];
+		}
         }
         close FH;
 }
@@ -103,6 +106,7 @@ sub getSampleInfo{
 			$idx_PF = first { $format[$_] eq 'PF Clusters' } 0..$#format;
 		}
 		if($_ =~ /PF Clusters/){next;};
+		$format[$idx_Sample] =~ s/_S\d{1,2}$//g;
 		$format[$idx_PF] =~ s/,//g;
 			if ($sample_reads_count{$format[$idx_Sample]}){
 				$sample_reads_count{$format[$idx_Sample]} = $sample_reads_count{$format[$idx_Sample]} +$format[$idx_PF];

@@ -64,6 +64,7 @@ while(readdir $DH){
 				my $FCID=$4;
 				if (-e "$DIR/$line/$nova/CopyComplete.txt"){
 					if (-e "$OUTDIR/$MONTH/$nova" or -e "$DIR/$line/$nova/bcl2fastq.done"){
+						# Already done or in progress!!
 					}
 					elsif (-M "$DIR/$line/$nova/CopyComplete.txt" <5){
 						if ( -e  "$DIR/$line/$nova/SampleSheet.csv"){
@@ -79,6 +80,18 @@ while(readdir $DH){
 						}
 						else{
 							#`echo "Can't read $DIR/$line/$nova/SampleSheet.csv" |mutt -s "bcl2fastq error" patidarr\@mail.nih.gov`;
+						}
+					}
+				}
+				elsif(-e "$DIR/$line/$nova/RTAComplete.txt"){
+					if (-e "$OUTDIR/$MONTH/$nova" or -e "$DIR/$line/$nova/bcl2fastq.done"){
+                                                # Already done or in progress!!
+                                        }
+					elsif (-M "$DIR/$line/$nova/RTAComplete.txt" <5){
+						if( -e "$DIR/$line/$nova/$FCID.csv"){
+							`cp -rf "$DIR/$line/$nova/$FCID.csv" "$DIR/$line/$nova/SampleSheet.csv"`;
+							`/usr/local/bin/qsub -N $FCID -o $LOG -e $LOG -v target="$DIR$line/$nova" $PIPELINE/submit_snakemake.sh`;
+							exit;
 						}
 					}
 					else{

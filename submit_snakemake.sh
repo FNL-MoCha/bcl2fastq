@@ -30,7 +30,7 @@ else
 fi
 
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
-	--nolock  --ri -k -p -T -r -j 3000\
+	--nolock  --ri -k -p -r -j 3000\
 	--jobname {params.rulename}.{jobid}\
 	--cluster "qsub -W umask=022 -V -o $log -e $log {params.batch}"\
 	--stats $log/${time}.stats >& $log/${time}.log
