@@ -34,7 +34,7 @@ FCID=path[-2]
 
 
 onerror:
-	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov ")
+	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com ")
 
 f = open(OUTPUT+"/"+FCID+"/SampleSheet.csv", 'r')
 FCName=FCID.split("_")
@@ -60,7 +60,7 @@ for line in f:
 			column = line.split(",")
 			for vals in column:
 				if ' ' in vals:
-					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov")
+					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com")
 					exit()
 			if '10X'.lower() in column[project].lower():
 				PROJECT= '10X'
@@ -102,7 +102,7 @@ rule Final:
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/ShallowSeq/; sh launchShallowSeq.sh {FCID}"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c robin.harrington@nih.gov -c nikitha.nair@nih.gov -c tomas.vilimas@nih.gov
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c robin.harrington@nih.gov -c nikitha.nair@nih.gov -c tomas.vilimas@nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	elif [ {params.project} == 'TST500'  ]; then
 		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
 		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
@@ -110,15 +110,15 @@ rule Final:
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMP_sample.sh {FCID} --launch"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c erin.mosher@nih.gov -c maria.saeed@nih.gov -c tomas.vilimas@nih.gov -c allison.poore@nih.gov
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c erin.mosher@nih.gov -c maria.saeed@nih.gov -c tomas.vilimas@nih.gov -c allison.poore@nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	elif [ {params.project} == '10X' ]; then
 		echo "# Do nothing; no need to transfer anything to biowulf"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c brandie.fullmer@nih.gov -c tomas.vilimas@nih.gov -c justine.mccutcheon@nih.gov -c amanda.peach@nih.gov
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c brandie.fullmer@nih.gov -c tomas.vilimas@nih.gov -c justine.mccutcheon@nih.gov -c amanda.peach@nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	
 	else
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
 		$HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov -c anna.leefong@nih.gov
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c li.chen2@nih.gov -c dasbiswa@mail.nih.gov -c amanda.peach@nih.gov -c brandie.fullmer@nih.gov -c justine.mccutcheon@nih.gov -c tomas.vilimas@nih.gov -c robin.harrington@nih.gov -c thomas.forbes@nih.gov -c nikitha.nair@nih.gov -c anna.leefong@nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	fi
 	############################
 	"""
