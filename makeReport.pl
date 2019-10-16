@@ -1,8 +1,9 @@
 #!/usr/bin/perl -sw
 use List::Util qw(first);
 #local $SIG{__WARN__} = sub {my $message =shift; die $message;};
-# ./makeReport.pl /projects/lihc_hiseq/static/ 170905_D00717_0062_AHTW7FBCXY/Unaligned HTW7FBCXY |mutt -e "my_hdr Content-Type: text/html" -s "test" patidarr@mail.nih.gov
-# /home/patidarr/bcl2fastq.v2/makeReport.pl /projects/lihc_hiseq/scratch/BW_transfers/2019_January/ 181226_D00748_0163_ACD1ALANXX CD1ALANXX ~/bcl2fastq.v2/Master.txt mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on 181226_D00748_0163_ACD1ALANXX" patidarr@mail.nih.gov
+#use English qw( −no_match_vars );
+
+#my $username = getpwuid $UID;
 
 my $fastq_dir=$ARGV[0];
 my $run_name=$ARGV[1];
@@ -80,10 +81,10 @@ sub getSampleID{
                         $idxID   = first { $format[$_] eq 'Sample_ID' } 0..$#format;
 			$ID_NAME{$format[$idxID]} = $format[$idxID];
                 }
-		if ($_ =~ /Sample_Name/){
-			$idxName = first { $format[$_] eq 'Sample_Name' } 0..$#format;
-			$ID_NAME{$format[$idxName]} = $format[$idxID];
-		}
+		#if ($_ =~ /Sample_Name/){
+		#	$idxName = first { $format[$_] eq 'Sample_Name' } 0..$#format;
+		#	$ID_NAME{$format[$idxName]} = $format[$idxID];
+		#}
         }
         close FH;
 }
@@ -160,7 +161,7 @@ sub getPDXID{
 	while(<FH>){
 		chomp;
 		my @a=split("\t",$_);
-		if($a[2] =~$sample and $a[9] =~/$run_id/){
+		if($a[2] =~$sample and $a[8] =~/$run_id/){
 			$sample=$a[6];
 			next;
 		}

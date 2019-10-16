@@ -59,7 +59,7 @@ while (my $row = <$fh>) {
 			}
 			next;
 		}
-		if ($row =~ /TST500/){
+		if ($a[$project] =~ /^TST500$/){
 			print "$a[$lane],$a[$id],$a[$id],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 		}
 		elsif ($type =~ /dual/){
@@ -67,7 +67,7 @@ while (my $row = <$fh>) {
 				print "$row\n";
 				exit;
 			}
-			if($row =~ /control/i or $a[$id] =~ /UHR/ or $a[$id] =~ /HBR/ or $a[$id] =~ /CEPH/ or $a[$id] =~ /HAP/){
+			if($row =~ /control/i or $row =~ /training/i or $a[$id] =~ /UHR/ or $a[$id] =~ /HBR/ or $a[$id] =~ /CEPH/ or $a[$id] =~ /HAP/){
 				print "$a[$lane],$a[$id],$a[$name],$a[$I7_Index_ID],$a[$index],$a[$I5_Index_ID],$a[$index2],$a[$project],$a[$desc],$a[$note]\n";
 				next;
 			}

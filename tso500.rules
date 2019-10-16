@@ -1,0 +1,84 @@
+TARGET=[]
+for sample in SAMPLES:
+	TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+sample+"/"+sample+".gt"]
+	TARGET  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+sample+"/"+sample+".gt"]
+	TARGET  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+sample+"/"+sample+".cnv.fc.txt"]
+	TARGET  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+sample+"/"+sample+".fusion.txt"]
+	TARGET  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+sample+"/"+sample+".vcf"]
+	#TARGET  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+sample+"/"+sample+".clean.annotated.filtered.maf"]
+
+rule Final_TSO500:
+	input:
+		TARGET
+	output:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/QC/{FCID}.qc.txt"
+	params:
+		rulename = "final",
+		script   = SOURCE +"tso500/qc.sh",
+		batch    = "-p quick -t 4:00:00 --mem=2G -c 1"
+	shell: """
+	############################
+	echo -e "Sample\\tMTC\\tContScore\\tContLevel\\tMeanFamilyDepth\\tPctDuplexFamilies\\tPFReads\\tReadEnrich\\tnoiseAF\\tMAD\\tMedianInsertSize\\tUniformity20%\\tPCT_500X\\tPCT_700X\\tPCT_1000X\\tPCT_1500X\\tMedianExonCoverage\\tTMB\\tMaxSomaticAF\\tMSI_UsableSites\\tMSI_UnstableSitesPct" >{output}
+	for sam in {SAMPLES}; do
+		#chmod -f g+rwx /projects/lihc_hiseq/active/Biowulf_Image/TSO500/${{sam}}
+		#chgrp -f MoCha /projects/lihc_hiseq/active/Biowulf_Image/TSO500/${{sam}}
+		#find /projects/lihc_hiseq/active/Biowulf_Image/TSO500/${{sam}}/ -group $USER -exec chgrp -f MoCha {{}} \;
+		#find /projects/lihc_hiseq/active/Biowulf_Image/TSO500/${{sam}}/  \( -type f -user $USER -exec chmod g+rw {{}} \; \) , \( -type d -user $USER -exec chmod g+rwx {{}} \; \)
+		sh {params.script} /projects/lihc_hiseq/active/Biowulf_Image/TSO500/ ${{sam}} >>{output}
+	done
+	#echo -e 'Hi,\\n\\nSuccessfully finished TSO500 pipeline version zipmocom-0.8.2.10 on  {FCID}. Results are in /projects/lihc_hiseq/active/Biowulf_Image/TSO500/ folder on Isilion Drive \\n\\nThank you,\\nBioinformatics Team, MoCha'|mutt -s '{FCID}' -a {output} -- x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+	############################
+	"""
+rule genotype:
+	input:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/{sampleID}.vcf"
+	output:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/{sampleID}.gt"
+	params:
+		rulename = "genotype",
+		script   = SOURCE +"tso500/vcf2genotype.pl",
+		batch    = "-p quick -t 00:30:00 --mem=1G -c 1"
+	shell: """
+	perl {params.script} {input} >{output}
+	"""
+rule fusion:
+	input:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"
+	output:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/{sampleID}.fusion.txt"
+	params:
+		rulename = "fusion",
+		batch    = "-p quick -t 00:10:00 --mem=2G -c 1"
+	shell: """
+	############################
+	sed -e 's/\\t/,/g' /projects/lihc_hiseq/active/Biowulf_Image/TSO500/{wildcards.sampleID}/zipmocom_0.8.2.10_Analysis/DNA/FusionFilter/{wildcards.sampleID}.fusion.csv |	cut -f1,3-11,12,15,16 -d, |grep -v "^#"|sed -e 's/,/\\t/g' >{output}
+	############################
+	"""
+rule cnv:
+	input: 
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"
+	output:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/{sampleID}.cnv.fc.txt"
+	params:
+		rulename = "cnv",
+		script	 = SOURCE +"tso500/filterCNV.pl",
+		batch    = "-p quick -t 00:10:00 --mem=2G -c 1"
+	shell: """
+	############################
+	{params.script} /projects/lihc_hiseq/active/Biowulf_Image/TSO500/{wildcards.sampleID}/zipmocom_0.8.2.10_Analysis/DNA/CnvCaller/{wildcards.sampleID}.raw_CopyNumberVariants.vcf {wildcards.sampleID} >{output}
+	############################
+	"""
+rule GVCF2VCF:
+	input:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"
+	output:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/{sampleID}.vcf",
+	params:
+		rulename = "annotation",
+		script1   = SOURCE +"tso500/filterVCF.pl",
+		batch="-p quick -t 2:00:00 --mem=10G -c 10"
+	shell: """
+	############################
+	perl {params.script1} /projects/lihc_hiseq/active/Biowulf_Image/TSO500/{wildcards.sampleID}/zipmocom_0.8.2.10_Analysis/DNA/SmallVariantFilter/{wildcards.sampleID}.raw.PairRealigned.Clean.genome.vcf >/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{wildcards.sampleID}/{wildcards.sampleID}.vcf
+	############################
+	"""

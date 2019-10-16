@@ -6,11 +6,11 @@ import glob
 from snakemake.utils import R
 #from snakemake.utils import min_vession
 #min_version("3.2")
-#version on moab now 5.4.4 --04/15/19 --patidarr
+#version on moab now 5.4.4 --04/15/19 --{USER}
 from snakemake.exceptions import MissingInputException
 
 #Author:	Rajesh Patidar
-#Email:		patidarr
+#Email:		{USER}
 #This is a pipeline to convert bcl files to fastq and send a report to a email list.
 # it also changes names Sample_SampleID_FCID nomenclature.
 # 
@@ -19,11 +19,11 @@ SOURCE=os.environ['SOURCE']
 INPUT=os.environ['INPUT']
 OUTPUT=os.environ['OUTPUT']
 MONTH=os.environ['MONTH']
+USER=os.environ['USER']
 OUTPUT=OUTPUT+MONTH+"/"
 # Snakemake Base location
 shell.prefix("""
 #PBS -S /bin/bash
-source /opt/nasapps/modules/Modules/3.2.9/init/bash
 module load snakemake
 set -e -o pipefail
 sleep 10s
@@ -34,7 +34,7 @@ FCID=path[-2]
 
 
 onerror:
-	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com ")
+	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com")
 
 f = open(OUTPUT+"/"+FCID+"/SampleSheet.csv", 'r')
 FCName=FCID.split("_")
@@ -45,6 +45,7 @@ TARGETS = []
 #
 #
 PROJECT="Other"
+SAMPLES= []
 for line in f:
 	line = line.rstrip()
 	if 'Sample_ID' in line: 
@@ -60,7 +61,7 @@ for line in f:
 			column = line.split(",")
 			for vals in column:
 				if ' ' in vals:
-					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' patidarr@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com")
+					os.system("echo 'I dont expect space\n Please fix SampleSheet for me to proceed forward' |mutt -s 'bcl2fastq failed' {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com")
 					exit()
 			if '10X'.lower() in column[project].lower():
 				PROJECT= '10X'
@@ -69,16 +70,20 @@ for line in f:
 				#if column[desc] == 'TST500':
 				PROJECT= 'TST500'
 				TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
+				TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+column[sampleID]+"/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"]
+				TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/QC/"+FCID+".qc.txt"]
+				SAMPLES  += [column[sampleID]]
 			elif 'shallowseq' in column[project].lower():
 				PROJECT= 'shallowseq'
-				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
-				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
-				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleID]+"_"+FCName+"/Biowulf_Transfer.txt"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleID]+"_"+FCName+"/Sample_"+column[sampleID]+"_"+FCName+"_R1.fastq.gz"]
+				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleID]+"_"+FCName+"/Sample_"+column[sampleID]+"_"+FCName+"_R2.fastq.gz"]
 			else:
 				
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
+include: SOURCE +"/tso500.rules"
 #################################
 localrules: Final, Transfer, Merge, TST500
 #################################
@@ -88,40 +93,74 @@ localrules: Final, Transfer, Merge, TST500
 rule Final:
 	input: 
 		TARGETS,
-		OUTPUT+FCID+"/Reports/html/tree.html"
+		OUTPUT+FCID+"/Reports/html/tree.html",
 	params:
 		rulename = "Final",
 		project  = PROJECT,
-		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+		#batch    ="-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb",
+		batch    ="--partition=norm   --time=24:00:00 --mem=1G  --cpus-per-task=1"
 	shell: """
 	############################
+	module load globus
 	touch "{INPUT}{FCID}/bcl2fastq.done"
-	if [ {params.project} == 'shallowseq'  ]; then
+	if [ "{params.project}" == "shallowseq"  ]; then
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-		task_id=$($HOME/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
+		task_id=$(globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
-		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
+		globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/ShallowSeq/; sh launchShallowSeq.sh {FCID}"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
-	elif [ {params.project} == 'TST500'  ]; then
-		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
-		echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
-		task_id=$($HOME/.globus-cli-virtualenv/bin/globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
-		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
-		$HOME/.globus-cli-virtualenv/bin/globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
-		ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMO.sh {FCID} --launch"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
-	elif [ {params.project} == '10X' ]; then
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+	elif [ "{params.project}" == "TST500"  ]; then
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+	elif [ "{params.project}" == "10X" ]; then
 		echo "# Do nothing; no need to transfer anything to biowulf"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov  -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov  -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	
 	else
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-		$HOME/.globus-cli-virtualenv/bin/globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" patidarr@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+		globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	fi
 	############################
 	"""
+
+#################################
+# zipmo for TSO500
+#################################
+rule run_zipmo:
+	input:
+		OUTPUT+FCID+"/Reports/html/tree.html"
+	output:
+		"/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{sampleID}/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"
+	params:
+		rulename = "zipmo",
+		batch="--partition=norm --time=48:00:00 --mem=48G --cpus-per-task=32"
+	shell: """
+	############################
+	echo $TMPDIR
+	echo $PWD
+	cd /scratch/local/$USER
+	#unset TMPDIR
+	INPUT_DIR="{OUTPUT}{FCID}/TST500/"
+	SAMPLE="{wildcards.sampleID}"
+	RESOURCE="/projects/lihc_hiseq/active/{USER}/zipmocom-0.8.2.10/"
+	OUT_DIR="/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{wildcards.sampleID}"
+	rm -rf /scratch/DTP-MoCha/{wildcards.sampleID}
+	mkdir -p /scratch/DTP-MoCha/{wildcards.sampleID}/
+	touch /scratch/DTP-MoCha/{wildcards.sampleID}/null
+	mkdir -p ${{OUT_DIR}}
+	
+	export SINGULARITY_BINDPATH="${{INPUT_DIR}}:/opt/illumina/data,${{RESOURCE}}:/opt/illumina/2.2.0.4,/scratch/DTP-MoCha/{wildcards.sampleID}/:/opt/illumina/result,/scratch/DTP-MoCha/{wildcards.sampleID}/null:/dev/null,/scratch/local/$USER:/tmp"
+	
+	module load singularity # 3.2.1-1
+	singularity run --userns /projects/lihc_hiseq/active/{USER}/zipmocom-0.8.2.10/zipmocom-0.8.2.10.sif --FastqFolder /opt/illumina/data/ --Sample {wildcards.sampleID} --OutputFolder /opt/illumina/result/
+	rm -rf /scratch/DTP-MoCha/{wildcards.sampleID}/null
+	mv -f /scratch/DTP-MoCha/{wildcards.sampleID}/* ${{OUT_DIR}}/
+	rm -rf ${{OUT_DIR}}/zipmocom_0.8.2.10_Analysis/DNA/DnaAlignment/*
+	rm  -rf /scratch/DTP-MoCha/{wildcards.sampleID}
+	############################
+	"""
+
 #################################
 # Single Cell Count for 10X genomics
 #################################
@@ -132,22 +171,19 @@ rule X10X:
 		OUTPUT+FCID+"/{sample}.10X.done"
 	params:
 		rulename = "10X",
-		batch    = "-l nodes=1:ppn=16,walltime=700:00:00,pvmem=64gb"
+		batch    ="--partition=norm   --time=50:00:00 --mem=64G  --cpus-per-task=16"
 	shell: """
 	############################
 	module load bcl2fastq2
 	mkdir -p /projects/lihc_hiseq/scratch/BW_transfers/SingleCellSeq/{wildcards.sample}_{FCName}
 	cd /projects/lihc_hiseq/scratch/BW_transfers/SingleCellSeq/{wildcards.sample}_{FCName}
-	if [[ {wildcards.sample}  == '482815'* -o {wildcards.sample}  == '521955'*  ]]; then
-		/projects/lihc_hiseq/active/SingleCell/cellranger-3.0.2/cellranger count --id={wildcards.sample}  --fastqs={OUTPUT}/{FCID}/{FCName}/ --transcriptome=/projects/lihc_hiseq/active/SingleCell/refdata-cellranger-hg19-and-mm10-3.0.0/ --jobmode=local --localcores=16 --sample={wildcards.sample} --localmem=64  >{output}
-	else
-		/projects/lihc_hiseq/active/SingleCell/cellranger-3.0.2/cellranger count --id={wildcards.sample} --fastqs={OUTPUT}/{FCID}/{FCName}/ --transcriptome=/projects/lihc_hiseq/active/SingleCell/refdata-cellranger-hg19-3.0.0/ --jobmode=local --localcores=16 --sample={wildcards.sample} --localmem=64  >{output}
-	fi
+	#/projects/lihc_hiseq/active/SingleCell/cellranger-3.0.2/cellranger count --id={wildcards.sample}  --fastqs={OUTPUT}/{FCID}/{FCName}/ --transcriptome=/projects/lihc_hiseq/active/SingleCell/refdata-cellranger-hg19-and-mm10-3.0.0/ --jobmode=local --localcores=16 --sample={wildcards.sample} --localmem=64  >{output}
+	/projects/lihc_hiseq/active/SingleCell/cellranger-3.0.2/cellranger count --id={wildcards.sample} --fastqs={OUTPUT}/{FCID}/{FCName}/ --transcriptome=/projects/lihc_hiseq/active/SingleCell/refdata-cellranger-hg19-3.0.0/ --jobmode=local --localcores=16 --sample={wildcards.sample} --localmem=64  >{output}
 	
 	############################
 	"""
 #################################
-# Make globus input for the TST500 Run
+# Make globus input for the TST500 for transfer to biowulf
 #################################
 rule TST500:
 	input:
@@ -156,7 +192,7 @@ rule TST500:
 		OUTPUT+FCID+"/{sample}.transfer.done"
 	params:
 		rulename = "TST500",
-		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+		batch    ="--partition=norm   --time=24:00:00 --mem=1G  --cpus-per-task=1"
 	shell: """
 	############################
 	cd {OUTPUT}/../
@@ -171,7 +207,7 @@ rule TST500:
 # This is to make globus input
 #
 #################################
-rule Transfer:
+rule FindDeliverableName:
 	input:
 		OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R1.fastq.gz",
 		OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R2.fastq.gz"
@@ -179,18 +215,17 @@ rule Transfer:
 		OUTPUT+FCID+"/Sample_{library}_{FCName}/Biowulf_Transfer.txt"
 	params:
 		rulename = "Transfer",
-		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=1gb"
+		batch    ="--partition=norm   --time=24:00:00 --mem=1G  --cpus-per-task=1"
 	shell: """
 	############################
 	string=`{SOURCE}mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
 
-	count=`echo ${{string}} |cut -d ' ' -f1`
-	search=`echo ${{string}} |cut -d ' ' -f2`
-	type=`echo ${{string}} |cut -d ' ' -f3`
-	project=`echo ${{string}} |cut -d ' ' -f4`
+	search=`echo ${{string}} |cut -d ' ' -f1`
+	type=`echo ${{string}} |cut -d ' ' -f2`
+	project=`echo ${{string}} |cut -d ' ' -f3`
 
-	if [[ ${{project}} = 'PDX' ]]; then
-		if  [[ ${{type}} = 'RNASEQ' ]] ; then
+	if [[ "${{project}}" = "PDX" ]]; then
+		if  [[ "${{type}}" = "RNASEQ" ]] ; then
 			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} RNA`
 			depth=`grep -A2 {wildcards.library} {OUTPUT}/{FCID}/Reports/html/{FCName}/all/all/all/laneBarcode.html|cut -f2 -d">"|cut -f1 -d"<" |grep ","|sed -e 's/,//g'|awk '{{ sum += $1 }} END {{ print sum }}'`
 			if [ ${{depth}}  -gt 20000000 ]; then
@@ -212,10 +247,9 @@ rule Transfer:
 	############################
 	"""
 #################################
-# Merge fq files if same sample is loaded on to multiple lanes.
-# Also changes names to contain FCID in it.
+# Change names to contain FCID in it.
 #################################
-rule Merge:
+rule Rename:
 	input:
 		OUTPUT+FCID+"/Reports/html/tree.html"
 	output:
@@ -223,15 +257,14 @@ rule Merge:
 		R2=OUTPUT+FCID+"/Sample_{library}_{FCName}/Sample_{library}_{FCName}_R2.fastq.gz",
 	params:
 		rulename = "Merge",
-		batch    = "-l nodes=1:ppn=3,walltime=700:00:00,pvmem=5gb"
+		batch    ="--partition=norm   --time=24:00:00 --mem=1G  --cpus-per-task=1"
 	shell: """
 	############################
 	string=`{SOURCE}mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
 
-	count=`echo ${{string}} |cut -d ' ' -f1`
-	search=`echo ${{string}} |cut -d ' ' -f2`
-	type=`echo ${{string}} |cut -d ' ' -f3`
-	project=`echo ${{string}} |cut -d ' ' -f4`
+	search=`echo ${{string}} |cut -d ' ' -f1`
+	type=`echo ${{string}} |cut -d ' ' -f2`
+	project=`echo ${{string}} |cut -d ' ' -f3`
 	R1=`find {OUTPUT}/{FCID}/ -name "${{search}}_S*_R1_001.fastq.gz"|sort| tr '\\n' ' '`
 	mv ${{R1}} {output.R1}
 	R2=`echo ${{R1}} |sed -e 's/_R1_001/_R2_001/g'`
@@ -249,17 +282,17 @@ rule BCL2FASTQ:
 	params:
 		rulename = "bcl2fastq",
 		project  = PROJECT,
-		batch    = "-l nodes=1:ppn=1,walltime=700:00:00,pvmem=72gb,ncpus=16"
+		batch    ="--partition=norm   --time=50:00:00 --mem=72G  --cpus-per-task=16"
 	shell: """
 	############################
-	if [ {params.project} == 'TST500' ]; then
-		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --writing-threads 16 --mask-short-adapter-reads 35 --barcode-mismatches 0 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
-	elif [ {params.project} == '10X' ]; then
-		module load bcl2fastq2
+	module load bcl2fastq2/2.20.0
+	if [ "{params.project}" == "TST500" ]; then
+		bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --writing-threads 16 --mask-short-adapter-reads 35 --barcode-mismatches 0 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
+	elif [ "{params.project}" == "10X" ]; then
 		cd {OUTPUT}{FCID}/
 		/projects/lihc_hiseq/active/SingleCell/cellranger-3.0.2/cellranger mkfastq --id=10X --run={INPUT}{FCID} --csv={OUTPUT}{FCID}/SampleSheet.fixed.csv --output-dir={OUTPUT}{FCID}/ --localcores=16 --localmem=70 --jobmode=local
 	else
-		/opt/nasapps/development/bcl2fastq2/2.20/bin/bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --writing-threads 16 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
+		bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --writing-threads 16 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
 	fi
 	############################
 	"""
