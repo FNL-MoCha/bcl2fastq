@@ -43,3 +43,45 @@
 
 ### Rulegraph for 10X SampleSheet
 ![alt tag](10X_rulegraph.png)
+
+
+### In case where bcl2fastq is done but downstream rule(s) failed, you would need to skip the automatic part of the pipeline and just run snakemake part to do so:
+Something along the following code can be ran on head node and then submitted to cluster
+```
+#!/bin/bash
+# When trying on head node you need to set RUN=RUNID
+#RUN=$1
+Load Module 
+module load snakemake
+# This is the folder on BW_transfers where data is already existing for this RUNID
+#NOW=2019_October
+# Initialize other variable needed for the snakemake pipeline
+NOW=$(date +"%Y_%B")
+export MONTH="$NOW"
+export INPUT="/projects/lihc_hiseq/static/NovaSeq/"
+export OUTPUT="/projects/lihc_hiseq/scratch/BW_transfers/"
+#export TARGET="/projects/lihc_hiseq/static/$RUN/bcl2fastq.done"
+export TARGET="/projects/lihc_hiseq/static/NovaSeq/$RUN/bcl2fastq.done"
+export SOURCE="$HOME/bcl2fastq.v2/"
+export USER="$USER"
+log=$HOME/log
+time=`date +"%Y%m%d_%H%M%S"`
+
+# Do a dryrun (Remove the comment from next line)
+
+#snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake -n
+
+snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
+        --nolock  --ri -k -p -r -j 3000\
+        --restart-times 2\
+        --latency-wait 30\
+        --jobscript $SOURCE/jobscript.sh\
+        --jobname {params.rulename}.{jobid}\
+        --cluster "sbatch -o $log/{params.rulename}.%j  {params.batch}"\
+        --stats $log/${time}.stats >& $log/${time}.log
+```
+This script can be submitted to cluster using following resources, depending what SampleSheet is in play:
+```
+sbatch --export=RUN=<RUNID> --partition=norm   --time=24:00:00 <script.sh>
+```
+
