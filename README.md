@@ -44,14 +44,16 @@
 ### Rulegraph for 10X SampleSheet
 ![alt tag](10X_rulegraph.png)
 
+------------------------------------------------------------------------
 
-### In case where bcl2fastq is done but downstream rule(s) failed, you would need to skip the automatic part of the pipeline and just run snakemake part to do so:
-Something along the following code can be ran on head node and then submitted to cluster
+In case where bcl2fastq is done but downstream rule(s) failed, you would need to skip the automatic part of the pipeline and just run snakemake part to do so:	
+
+Something along the following code can be ran on head node and then submitted to cluster	
 ```
 #!/bin/bash
 # When trying on head node you need to set RUN=RUNID
 #RUN=$1
-Load Module 
+#Load Module 
 module load snakemake
 # This is the folder on BW_transfers where data is already existing for this RUNID
 #NOW=2019_October
