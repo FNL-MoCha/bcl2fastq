@@ -1,4 +1,5 @@
 # bcl2fastq pipeline on batch or aka FoRCE (Frederick Research Computing Environment)
+![alt tag](rulegraphs/bcl2fastq.pdf)
 ## Demultiplexing
 - Runs illumina bcl2fastq with different settings depending on SampleSheet:
 	- Run with TSO500 specific arguments when SampleSheet is from TSO500 experiments
