@@ -67,9 +67,10 @@ export INPUT="/projects/lihc_hiseq/static/NovaSeq/"
 export OUTPUT="/projects/lihc_hiseq/scratch/BW_transfers/"
 #export TARGET="/projects/lihc_hiseq/static/$RUN/bcl2fastq.done"
 export TARGET="/projects/lihc_hiseq/static/NovaSeq/$RUN/bcl2fastq.done"
-export SOURCE="$HOME/bcl2fastq.v2/"
+export SOURCE="/projects/lihc_hiseq/active/bcl2fastq.v2/"
 export USER="$USER"
 log=$HOME/log
+mkdir -l $log
 time=`date +"%Y%m%d_%H%M%S"`
 
 # Do a dryrun (Remove the comment from next line)
@@ -80,12 +81,13 @@ snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
         --nolock  --ri -k -p -r -j 3000\
         --restart-times 2\
         --latency-wait 30\
-        --jobscript $SOURCE/jobscript.sh\
+        --jobscript $SOURCE/bin/jobscript.sh\
         --jobname {params.rulename}.{jobid}\
         --cluster "sbatch -o $log/{params.rulename}.%j  {params.batch}"\
         --stats $log/${time}.stats >& $log/${time}.log
 ```
-This script can be submitted to cluster using following resources, depending what SampleSheet is in play:
+This script can be submitted to cluster using following command, depending what SampleSheet is in play:
+- If running on 10X SampleSheet, you may want to increse the wall time
 ```
 sbatch --export=RUN=<RUNID> --partition=norm   --time=24:00:00 <script.sh>
 ```
