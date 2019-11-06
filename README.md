@@ -36,13 +36,13 @@
 
 
 ### Rulegraph for TSO500 SampleSheet
-![alt tag](TSO500_rulegraph.png)
+![alt tag](rulegraphs/TSO500_rulegraph.png)
 
 ### Rulegraph for WES SampleSheet
-![alt tag](WES_rulegraph.png)
+![alt tag](rulegraphs/WES_rulegraph.png)
 
 ### Rulegraph for 10X SampleSheet
-![alt tag](10X_rulegraph.png)
+![alt tag](rulegraphs/10X_rulegraph.png)
 
 ------------------------------------------------------------------------
 

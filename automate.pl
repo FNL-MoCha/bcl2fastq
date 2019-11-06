@@ -39,12 +39,12 @@ while(readdir $DH){
 			elsif (-M "$DIR/$line/RTAComplete.txt" <5){
 				`mkdir -p $OUTDIR/$MONTH/$line`;
 				if (-e "$DIR/$line/SampleSheet.csv"){
-					`sbatch -J $FCID -o $LOG/$FCID.sbatch  --time=150:00:00  --export=target="$DIR/$line",SOURCE=$PIPELINE $PIPELINE/submit_snakemake.sh`;
+					`sbatch -J $FCID -o $LOG/$FCID.sbatch  --time=150:00:00  --export=target="$DIR/$line",SOURCE=$PIPELINE $PIPELINE/bin/submit_snakemake.sh`;
 					exit;
 				}
 				elsif(-e "$DIR/$line/$FCID.csv"){
 					`cp -rf "$DIR/$line/$FCID.csv" "$DIR/$line/SampleSheet.csv"`;
-					`sbatch -J $FCID -o $LOG/$FCID.sbatch --time=150:00:00  --export=target="$DIR/$line",SOURCE=$PIPELINE $PIPELINE/submit_snakemake.sh`;
+					`sbatch -J $FCID -o $LOG/$FCID.sbatch --time=150:00:00  --export=target="$DIR/$line",SOURCE=$PIPELINE $PIPELINE/bin/submit_snakemake.sh`;
 				}
 				else{
 					`echo "I don't have permissions to read $DIR/$line/SampleSheet.csv" |mutt -s "bcl2fastq error" $username\@mail.nih.gov`;
@@ -75,7 +75,7 @@ while(readdir $DH){
 						if( -e "$DIR/$line/$RUN/$FCID.csv"){
 							`cp -rf "$DIR/$line/$RUN/$FCID.csv" "$DIR/$line/$RUN/SampleSheet.csv"`;
 							#print STDERR "sbatch -J $FCID -o $LOG/$FCID.sbatch --time=150:00:00  --export=target=$DIR/$line/$RUN $PIPELINE/submit_snakemake.sh\n";
-							`sbatch -J $FCID -o $LOG/$FCID.sbatch --time=150:00:00  --export=target="$DIR/$line/$RUN",SOURCE=$PIPELINE $PIPELINE/submit_snakemake.sh`;
+							`sbatch -J $FCID -o $LOG/$FCID.sbatch --time=150:00:00  --export=target="$DIR/$line/$RUN",SOURCE=$PIPELINE $PIPELINE/bin/submit_snakemake.sh`;
 							exit;
 						}
 						else{

@@ -24,15 +24,15 @@ cp ${INPUT}/${FCID}/SampleSheet.csv ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
 dos2unix ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
 if  grep -q -i 10X ${INPUT}/${FCID}/SampleSheet.csv
 then
-	$SOURCE/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv 10X >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
+	$SOURCE/bin/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv 10X >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
 else
-	$SOURCE/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
+	$SOURCE/bin/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
 	mv -f ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
 fi
 
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
 	--nolock  --ri -k -p -r -j 3000\
-	--jobscript $SOURCE/jobscript.sh\
+	--jobscript $SOURCE/bin/jobscript.sh\
 	--latency-wait 30\
 	--jobname {params.rulename}.{jobid}\
 	--cluster "sbatch -o $log/{params.rulename}.%j  {params.batch}"\
@@ -56,10 +56,10 @@ export USER="$USER"
 mkdir -p ${OUTPUT}/${MONTH}/${RUN}/
 cp ${INPUT}/${RUN}/SampleSheet.csv ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
 dos2unix ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
-${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv >${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv
+${SOURCE}/bin/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv >${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv
 mv -f ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake --dryrun
-sbatch -J ${RUN} -o ~/log/${FCID}.bcl2fastq.sbatch --export=target=/projects/lihc_hiseq/static/${RUN} ~/bcl2fastq.v2/submit_snakemake.sh
+sbatch -J ${RUN} -o ~/log/${FCID}.bcl2fastq.sbatch --export=target=/projects/lihc_hiseq/static/${RUN} ~/bcl2fastq.v2/bin/submit_snakemake.sh
 
 
 RUN=''
@@ -74,14 +74,10 @@ export USER="$USER"
 mkdir -p ${OUTPUT}/${MONTH}/${RUN}/
 cp ${INPUT}//${RUN}/SampleSheet.csv ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
 dos2unix ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv
-${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv >${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv
+${SOURCE}/bin/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${RUN}/SampleSheet.csv >${OUTPUT}/${MONTH}/${RUN}/SampleSheet.fixed.csv
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake --dryrun
 
-sbatch -J ${RUN} -o ~/log/${FCID}.bcl2fastq.sbatch --export=target=/projects/lihc_hiseq/static/NovaSeq/${RUN} ~/bcl2fastq.v2/submit_snakemake.sh
+sbatch -J ${RUN} -o ~/log/${FCID}.bcl2fastq.sbatch --export=target=/projects/lihc_hiseq/static/NovaSeq/${RUN} ~/bcl2fastq.v2/bin/submit_snakemake.sh
 
 
 END
-
-#qsub -N CB9CLANXX -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/170824_D00748_0099_BCB9CLANXX ~/bcl2fastq.v2/submit_snakemake.sh
-#qsub -N CCKGTANXX -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/180703_D00717_0102_ACCKGTANXX ~/bcl2fastq.v2/submit_snakemake.sh
-#qsub -N CCKPVANXX -o ~/log/ -e ~/log/ -v target=/projects/lihc_hiseq/static/180703_D00717_0103_BCCKPVANXX ~/bcl2fastq.v2/submit_snakemake.sh
