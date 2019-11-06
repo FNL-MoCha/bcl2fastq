@@ -19,7 +19,7 @@
 	- Create a simple fusion report
 	- Create a simple CNV report from the VCF file
 	- Create a final QC report and send email to #run_stats channel on Slack.
-	- Still to add: Annotation and variant filtering from the VCF file (MOMA)
+	- Still to add: Annotation and variant filtering from the VCF file (MOMA)	
 This is a plug and play part of the pipeline and can be removed/suppressed easily by commenting `include: SOURCE +"/tso500.rules"` line in bcl2fastq.snakemake
 ## Email report on run to interested parties
 - This is the final rule, globus transfer individual files are concatenated to one and a globus transfer is requested. It also parses the html output from bcl2fastq to create a report at FC level, lane level and sample level. This report is emaild to user and #run_stats channel on Slack.
