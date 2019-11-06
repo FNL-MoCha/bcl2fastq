@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -sw
+#!/usr/bin/perl -sw
 use List::Util qw(first);
 use 5.010;
 local $SIG{__WARN__} = sub {

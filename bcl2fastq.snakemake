@@ -34,7 +34,7 @@ FCID=path[-2]
 
 
 onerror:
-	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com")
+	shell("echo 'bcl2fastq pipeline failed on {FCID} '|mutt -s ' bcl2fastq status' `whoami`@mail.nih.gov")
 
 f = open(OUTPUT+"/"+FCID+"/SampleSheet.csv", 'r')
 FCName=FCID.split("_")
@@ -83,9 +83,10 @@ for line in f:
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Biowulf_Transfer.txt"]
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R1.fastq.gz"]
 				TARGETS  += [OUTPUT+FCID+"/Sample_"+column[sampleName]+"_"+FCName+"/Sample_"+column[sampleName]+"_"+FCName+"_R2.fastq.gz"]
+SAMPLES =sorted(list(set(SAMPLES)))
 include: SOURCE +"/tso500.rules"
 #################################
-localrules: Final, Transfer, Merge, TST500
+localrules: Final, FindDeliverableName, TST500
 #################################
 # Parse html pages and send report email.
 #################################
@@ -109,17 +110,17 @@ rule Final:
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/ShallowSeq/; sh launchShallowSeq.sh {FCID}"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+		{SOURCE}/makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	elif [ "{params.project}" == "TST500"  ]; then
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+		{SOURCE}/makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	elif [ "{params.project}" == "10X" ]; then
 		echo "# Do nothing; no need to transfer anything to biowulf"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov  -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+		{SOURCE}/makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov  -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	
 	else
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
 		globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
-		{SOURCE}makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+		{SOURCE}/makeReport.pl {OUTPUT} {FCID} {FCName} ~/bcl2fastq.v2/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	fi
 	############################
 	"""
@@ -137,9 +138,6 @@ rule run_zipmo:
 		batch="--partition=norm --time=48:00:00 --mem=48G --cpus-per-task=32"
 	shell: """
 	############################
-	echo $TMPDIR
-	echo $PWD
-	cd /scratch/local/$USER
 	#unset TMPDIR
 	INPUT_DIR="{OUTPUT}{FCID}/TST500/"
 	SAMPLE="{wildcards.sampleID}"
@@ -147,15 +145,13 @@ rule run_zipmo:
 	OUT_DIR="/projects/lihc_hiseq/active/Biowulf_Image/TSO500/{wildcards.sampleID}"
 	rm -rf /scratch/DTP-MoCha/{wildcards.sampleID}
 	mkdir -p /scratch/DTP-MoCha/{wildcards.sampleID}/
-	touch /scratch/DTP-MoCha/{wildcards.sampleID}/null
 	mkdir -p ${{OUT_DIR}}
 	
-	export SINGULARITY_BINDPATH="${{INPUT_DIR}}:/opt/illumina/data,${{RESOURCE}}:/opt/illumina/2.2.0.4,/scratch/DTP-MoCha/{wildcards.sampleID}/:/opt/illumina/result,/scratch/DTP-MoCha/{wildcards.sampleID}/null:/dev/null,/scratch/local/$USER:/tmp"
+	export SINGULARITY_BINDPATH="${{INPUT_DIR}}:/opt/illumina/data,${{RESOURCE}}:/opt/illumina/2.2.0.4,/scratch/DTP-MoCha/{wildcards.sampleID}/:/opt/illumina/result"
 	
 	module load singularity # 3.2.1-1
 	singularity run --userns /projects/lihc_hiseq/active/{USER}/zipmocom-0.8.2.10/zipmocom-0.8.2.10.sif --FastqFolder /opt/illumina/data/ --Sample {wildcards.sampleID} --OutputFolder /opt/illumina/result/
-	rm -rf /scratch/DTP-MoCha/{wildcards.sampleID}/null
-	mv -f /scratch/DTP-MoCha/{wildcards.sampleID}/* ${{OUT_DIR}}/
+	rsync -avzr /scratch/DTP-MoCha/{wildcards.sampleID}/* ${{OUT_DIR}}/
 	rm -rf ${{OUT_DIR}}/zipmocom_0.8.2.10_Analysis/DNA/DnaAlignment/*
 	rm  -rf /scratch/DTP-MoCha/{wildcards.sampleID}
 	############################
@@ -214,11 +210,11 @@ rule FindDeliverableName:
 	output:
 		OUTPUT+FCID+"/Sample_{library}_{FCName}/Biowulf_Transfer.txt"
 	params:
-		rulename = "Transfer",
+		rulename = "FindDeliverableName",
 		batch    ="--partition=norm   --time=24:00:00 --mem=1G  --cpus-per-task=1"
 	shell: """
 	############################
-	string=`{SOURCE}mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
+	string=`{SOURCE}/mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
 
 	search=`echo ${{string}} |cut -d ' ' -f1`
 	type=`echo ${{string}} |cut -d ' ' -f2`
@@ -226,7 +222,7 @@ rule FindDeliverableName:
 
 	if [[ "${{project}}" = "PDX" ]]; then
 		if  [[ "${{type}}" = "RNASEQ" ]] ; then
-			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} RNA`
+			name=`{SOURCE}/getDeliverableName.pl {SOURCE}/Master.txt {wildcards.library} RNA`
 			depth=`grep -A2 {wildcards.library} {OUTPUT}/{FCID}/Reports/html/{FCName}/all/all/all/laneBarcode.html|cut -f2 -d">"|cut -f1 -d"<" |grep ","|sed -e 's/,//g'|awk '{{ sum += $1 }} END {{ print sum }}'`
 			if [ ${{depth}}  -gt 20000000 ]; then
 				echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
@@ -235,7 +231,7 @@ rule FindDeliverableName:
 				touch {OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 			fi
 		else
-			name=`{SOURCE}getDeliverableName.pl {SOURCE}Master.txt {wildcards.library} DNA`
+			name=`{SOURCE}/getDeliverableName.pl {SOURCE}/Master.txt {wildcards.library} DNA`
 			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R1.fastq.gz ${{name}}/${{name}}_R1.fastq.gz" >{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 			echo "{MONTH}/{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Sample_{wildcards.library}_{wildcards.FCName}_R2.fastq.gz ${{name}}/${{name}}_R2.fastq.gz" >>{OUTPUT}{FCID}/Sample_{wildcards.library}_{wildcards.FCName}/Biowulf_Transfer.txt
 
@@ -260,7 +256,7 @@ rule Rename:
 		batch    ="--partition=norm   --time=24:00:00 --mem=1G  --cpus-per-task=1"
 	shell: """
 	############################
-	string=`{SOURCE}mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
+	string=`{SOURCE}/mergeFASTQ.pl {OUTPUT}/{FCID}/SampleSheet.csv {wildcards.library}`
 
 	search=`echo ${{string}} |cut -d ' ' -f1`
 	type=`echo ${{string}} |cut -d ' ' -f2`

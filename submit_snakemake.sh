@@ -8,7 +8,6 @@ module load snakemake/5.5.4
 NOW=$(date +"%Y_%B")
 input=`dirname $target`
 FCID=`basename $target`
-SOURCE=`dirname $0`
 export TARGET="$target/bcl2fastq.done"
 export INPUT="$input/"
 export SOURCE="$SOURCE"
@@ -18,22 +17,23 @@ export USER="$USER"
 log="$HOME/log/"
 mkdir -p $log
 
-
+echo "$0#$SOURCE#"
 mkdir -p ${OUTPUT}/${MONTH}/${FCID}
 
 cp ${INPUT}/${FCID}/SampleSheet.csv ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
 dos2unix ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
 if  grep -q -i 10X ${INPUT}/${FCID}/SampleSheet.csv
 then
-	${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv 10X >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
+	$SOURCE/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv 10X >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
 else
-	${SOURCE}/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
+	$SOURCE/fixSampleSheet.pl ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv >${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv
 	mv -f ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.fixed.csv ${OUTPUT}/${MONTH}/${FCID}/SampleSheet.csv
 fi
 
 snakemake -r -p --snakefile $SOURCE/bcl2fastq.snakemake\
 	--nolock  --ri -k -p -r -j 3000\
 	--jobscript $SOURCE/jobscript.sh\
+	--latency-wait 30\
 	--jobname {params.rulename}.{jobid}\
 	--cluster "sbatch -o $log/{params.rulename}.%j  {params.batch}"\
 	--stats $log/${time}.stats >& $log/${time}.log

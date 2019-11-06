@@ -26,7 +26,7 @@ rule Final_TSO500:
 		#find /projects/lihc_hiseq/active/Biowulf_Image/TSO500/${{sam}}/  \( -type f -user $USER -exec chmod g+rw {{}} \; \) , \( -type d -user $USER -exec chmod g+rwx {{}} \; \)
 		sh {params.script} /projects/lihc_hiseq/active/Biowulf_Image/TSO500/ ${{sam}} >>{output}
 	done
-	#echo -e 'Hi,\\n\\nSuccessfully finished TSO500 pipeline version zipmocom-0.8.2.10 on  {FCID}. Results are in /projects/lihc_hiseq/active/Biowulf_Image/TSO500/ folder on Isilion Drive \\n\\nThank you,\\nBioinformatics Team, MoCha'|mutt -s '{FCID}' -a {output} -- x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
+	echo -e 'Hi,\\n\\nSuccessfully finished TSO500 pipeline version zipmocom-0.8.2.10 on  {FCID}. Results are in /projects/lihc_hiseq/active/Biowulf_Image/TSO500/ folder on Isilion Drive \\n\\nThank you,\\nBioinformatics Team, MoCha'|mutt -s '{FCID}' -a {output} -- x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	############################
 	"""
 rule genotype:
