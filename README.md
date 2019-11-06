@@ -24,3 +24,6 @@
 
 ### Rulegraph for WES SampleSheet
 ![alt tag](WES_rulegraph.png)
+
+### Rulegraph for 10X SampleSheet
+![alt tag](10X_rulegraph.png)
