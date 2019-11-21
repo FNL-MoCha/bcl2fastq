@@ -21,6 +21,8 @@ OUTPUT=os.environ['OUTPUT']
 MONTH=os.environ['MONTH']
 USER=os.environ['USER']
 OUTPUT=OUTPUT+MONTH+"/"
+source_ep="f99f31ee-00d2-11ea-8a5e-0e35e66293c2"
+dest_ep="2f208f48-00d3-11ea-8a5e-0e35e66293c2"
 # Snakemake Base location
 shell.prefix("""
 #PBS -S /bin/bash
@@ -70,8 +72,8 @@ for line in f:
 				#if column[desc] == 'TST500':
 				PROJECT= 'TST500'
 				TARGETS  += [OUTPUT+FCID+"/"+column[sampleID]+".transfer.done"]
-				TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+column[sampleID]+"/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"]
-				TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/QC/"+FCID+".qc.txt"]
+				#TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/"+column[sampleID]+"/zipmocom_0.8.2.10_Analysis/DNA_workflow_completed.txt"]
+				#TARGETS  += ["/projects/lihc_hiseq/active/Biowulf_Image/TSO500/QC/"+FCID+".qc.txt"]
 				SAMPLES  += [column[sampleID]]
 			elif 'shallowseq' in column[project].lower():
 				PROJECT= 'shallowseq'
@@ -106,13 +108,18 @@ rule Final:
 	touch "{INPUT}{FCID}/bcl2fastq.done"
 	if [ "{params.project}" == "shallowseq"  ]; then
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-		task_id=$(globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
+		task_id=$(globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" {source_ep}: {dest_ep}:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
 		task_id=`echo ${{task_id}}|sed -e 's/"//g'`
 		globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
 		ssh -q biowulf.nih.gov "cd /data/MoCha/ShallowSeq/; sh launchShallowSeq.sh {FCID}"
 		{SOURCE}/bin/makeReport.pl {OUTPUT} {FCID} {FCName} {SOURCE}/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	elif [ "{params.project}" == "TST500"  ]; then
-		
+		cat {OUTPUT}{FCID}/*transfer.done >{OUTPUT}{FCID}/globus.biowulf.txt
+        	echo "{MONTH}/{FCID}/SampleSheet.csv {FCID}/SampleSheet.csv" >>{OUTPUT}{FCID}/globus.biowulf.txt
+        	task_id=$(globus transfer --notify failed,inactive --jmespath 'task_id' -s checksum --batch --label "{FCID}" {source_ep}: {dest_ep}:TST500/ <"{OUTPUT}{FCID}/globus.biowulf.txt")
+        	task_id=echo ${{task_id}}|sed -e 's/"//g'
+        	globus task wait --timeout 50000 ${{task_id}} --polling-interval 100
+        	ssh -q biowulf.nih.gov "cd /data/MoCha/TST500/; sh /data/MoCha/TST500/launchZIPMO.sh {FCID} --l"
 		{SOURCE}/bin/makeReport.pl {OUTPUT} {FCID} {FCName} {SOURCE}/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	elif [ "{params.project}" == "10X" ]; then
 		echo "# Do nothing; no need to transfer anything to biowulf"
@@ -120,7 +127,7 @@ rule Final:
 	
 	else
 		cat {OUTPUT}{FCID}/Sample_*/Biowulf_Transfer.txt >{OUTPUT}{FCID}/globus.biowulf.txt
-		globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" d39c8f50-7483-11e8-93ba-0a6d4e044368: 6ca64a24-7484-11e8-93ba-0a6d4e044368:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
+		globus transfer -s checksum --preserve-mtime --batch --label "{FCID}" {source_ep}: {dest_ep}:DATA/{FCID}/ <"{OUTPUT}{FCID}/globus.biowulf.txt"
 		{SOURCE}/bin/makeReport.pl {OUTPUT} {FCID} {FCName} {SOURCE}/Master.txt |mutt -e "my_hdr Content-Type: text/html" -s "bcl2fastq status on {FCID}" {USER}@mail.nih.gov -c x0j3t1e6s2g6k1z8@mocha-workspace.slack.com
 	fi
 	############################
@@ -289,7 +296,7 @@ rule BCL2FASTQ:
 		cd {OUTPUT}{FCID}/
 		/projects/lihc_hiseq/active/SingleCell/cellranger-3.0.2/cellranger mkfastq --id=10X --run={INPUT}{FCID} --csv={OUTPUT}{FCID}/SampleSheet.fixed.csv --output-dir={OUTPUT}{FCID}/ --localcores=16 --localmem=70 --jobmode=local
 	else
-		bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --writing-threads 16 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv
+		bcl2fastq -R {INPUT}{FCID} -o {OUTPUT}{FCID}/ --ignore-missing-filter --ignore-missing-positions --ignore-missing-controls --ignore-missing-bcls --no-lane-splitting --processing-threads 16 --writing-threads 16 --sample-sheet {OUTPUT}{FCID}/SampleSheet.csv --minimum-trimmed-read-length 150
 	fi
 	############################
 	"""
